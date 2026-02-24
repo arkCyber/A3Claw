@@ -332,9 +332,8 @@ impl AiChatPage {
                 &state.input,
             )
             .id(AI_INPUT_ID.clone())
-            .on_input(AppMessage::AiInputChanged)
+            .on_input(|s| AppMessage::AiInputChanged(s))
             .on_submit(|_| AppMessage::AiSendMessage)
-            .on_focus(AppMessage::AiFocused)
             .width(Length::Fill)
             .into(),
             send_btn.into(),

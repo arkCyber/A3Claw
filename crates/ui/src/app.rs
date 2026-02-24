@@ -2766,11 +2766,16 @@ impl cosmic::Application for OpenClawApp {
                 }
                 self.claw_input.clear();
 
+                tracing::info!("[CLAW] Send command: {}", raw);
+                tracing::info!("[CLAW] Selected agent: {:?}", self.claw_selected_agent_id);
+
                 // Agent chat mode: send message to selected agent
                 if let Some(agent_id) = &self.claw_selected_agent_id {
+                    tracing::info!("[CLAW] Routing to agent chat: {}", agent_id);
                     return self.update(AppMessage::ClawAgentChat(raw));
                 }
 
+                tracing::info!("[CLAW] Routing to shell command execution");
                 let entry_id = self.claw_next_id;
                 self.claw_next_id += 1;
                 self.claw_history.push(ClawEntry::new(entry_id, &raw));
@@ -3442,11 +3447,14 @@ impl cosmic::Application for OpenClawApp {
                 }
             }
             AppMessage::ClawSelectAgent(agent_id) => {
-                self.claw_selected_agent_id = agent_id;
+                tracing::info!("[CLAW] Agent selected: {:?}", agent_id);
+                self.claw_selected_agent_id = agent_id.clone();
                 // Load agent list if not already loaded
                 if self.claw_agent_list.is_empty() {
                     self.claw_agent_list = openclaw_security::AgentProfile::list_all();
+                    tracing::info!("[CLAW] Loaded {} agents", self.claw_agent_list.len());
                 }
+                tracing::info!("[CLAW] Current selected agent: {:?}", self.claw_selected_agent_id);
             }
             AppMessage::ClawAgentChat(message) => {
                 if let Some(agent_id) = &self.claw_selected_agent_id {
