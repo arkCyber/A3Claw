@@ -1,0 +1,87 @@
+# 测试数字员工配置 - 客服助手
+# 这是一个用于测试 OpenClaw+ 功能的示例配置
+
+[agent]
+id = "test-agent-001"
+display_name = "测试客服助手"
+description = "用于测试 OpenClaw+ 安全沙箱功能的客服助手数字员工"
+role = "customer_support"
+owner = "test-user"
+created_by = "system"
+status = "active"
+
+# 安全边界配置
+memory_limit_mb = 512
+intercept_shell = true
+confirm_file_delete = true
+confirm_network = true
+confirm_shell_exec = true
+
+# 网络白名单
+network_allowlist = [
+    "api.openai.com",
+    "api.anthropic.com",
+    "localhost"
+]
+
+# AI 配置
+[agent.ai_config]
+endpoint = "http://localhost:11434"
+model_name = "qwen2.5:0.5b"
+max_tokens = 512
+temperature = 0.7
+system_prompt = """你是一个友好的客服助手，负责回答用户问题并提供帮助。
+你运行在 OpenClaw+ 安全沙箱中，所有文件操作和网络请求都会被监控和拦截。
+请保持礼貌、专业，并在需要时请求用户批准敏感操作。"""
+
+# 能力配置（插件白名单）
+[[agent.capabilities]]
+id = "file_read"
+name = "文件读取"
+description = "读取工作目录中的文件"
+risk_level = "low"
+enabled = true
+
+[[agent.capabilities]]
+id = "file_write"
+name = "文件写入"
+description = "在工作目录中创建或修改文件"
+risk_level = "medium"
+enabled = true
+
+[[agent.capabilities]]
+id = "web_search"
+name = "网络搜索"
+description = "通过 API 进行网络搜索"
+risk_level = "medium"
+enabled = true
+
+# 通信渠道
+[[agent.channels]]
+type = "cli"
+enabled = true
+
+[[agent.channels]]
+type = "web_ui"
+enabled = true
+
+# 文件夹访问白名单
+[[agent.folder_access]]
+path = "~/.openclaw-plus/workspace/test-agent-001"
+label = "Agent Workspace"
+readonly = false
+
+# 熔断器配置
+[agent.circuit_breaker]
+max_denials = 5
+max_failures = 3
+cooldown_secs = 60
+
+# 统计信息（初始值）
+[agent.stats]
+total_runs = 0
+successful_runs = 0
+failed_runs = 0
+denied_operations = 0
+approved_operations = 0
+total_runtime_secs = 0
