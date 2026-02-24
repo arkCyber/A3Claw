@@ -1638,10 +1638,11 @@ impl cosmic::Application for OpenClawApp {
             }
             // ── AI Chat ───────────────────────────────────────────────────────
             AppMessage::AiInputChanged(text) => {
+                tracing::info!("[IME] AiInputChanged: {:?} ({} chars)", text, text.chars().count());
                 self.ai_chat.input = text;
             }
             AppMessage::AiFocused => {
-                tracing::info!(lang = ?self.language, needs_ime = self.language.needs_ime(), "[IME] AI input focused");
+                tracing::info!("[IME] AI input focused, lang={:?}", self.language);
             }
             AppMessage::AiSendMessage => {
                 let input = self.ai_chat.input.trim().to_string();
@@ -2749,6 +2750,7 @@ impl cosmic::Application for OpenClawApp {
             }
             // ── Claw Terminal ──────────────────────────────────────────────
             AppMessage::ClawInputChanged(s) => {
+                tracing::info!("[IME] ClawInputChanged: {:?} ({} chars)", s, s.chars().count());
                 self.claw_input = s;
             }
             AppMessage::ClawInputFocused => {}
