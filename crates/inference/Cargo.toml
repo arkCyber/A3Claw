@@ -1,0 +1,43 @@
+[package]
+name = "openclaw-inference"
+version.workspace = true
+edition.workspace = true
+description = "Aerospace-grade local AI inference engine for OpenClaw+ (WasmEdge WASI-NN + llama.cpp)"
+
+[lib]
+name = "openclaw_inference"
+path = "src/lib.rs"
+
+[dependencies]
+tokio        = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+tracing      = { workspace = true }
+anyhow       = { workspace = true }
+thiserror    = { workspace = true }
+parking_lot  = { workspace = true }
+futures-util = { workspace = true }
+
+# HTTP client — SSE streaming for llama.cpp / Ollama / OpenAI-compat endpoints
+reqwest = { version = "0.12", features = [
+    "json",
+    "stream",
+    "rustls-tls",
+], default-features = false }
+
+# SHA-256 model integrity verification
+sha2 = { workspace = true }
+hex  = { workspace = true }
+
+# WasmEdge WASI-NN backend (optional — requires WasmEdge native library)
+wasmedge-sdk = { workspace = true, optional = true }
+
+[features]
+# Enable the WasmEdge WASI-NN backend (macOS + Linux).
+# On Windows, omit this feature or build with --no-default-features.
+wasi-nn  = ["wasmedge-sdk"]
+default  = []
+
+[dev-dependencies]
+tokio    = { workspace = true }
+tempfile = "3"

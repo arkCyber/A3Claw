@@ -1,0 +1,11 @@
+pub mod types;
+pub mod i18n;
+pub mod registry;
+#[cfg(feature = "wasm-loader")]
+pub mod loader;
+pub mod app;
+pub mod view_store;
+pub mod view_ai;
+pub mod view_bot;
+pub mod view_chat;
+pub mod view_dashboard;

@@ -1,0 +1,56 @@
+[package]
+name = "openclaw-store"
+version.workspace = true
+edition.workspace = true
+description = "ClawPlus plugin registry client and store UI"
+
+[[bin]]
+name = "openclaw-store"
+path = "src/main.rs"
+
+[lib]
+name = "openclaw_store"
+path = "src/lib.rs"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = "0.2"
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+dirs = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+parking_lot = { workspace = true }
+libcosmic = { workspace = true }
+
+# HTTP client for registry + download
+reqwest = { version = "0.12", features = [
+    "json",
+    "stream",
+    "rustls-tls",
+], default-features = false }
+
+# Async streaming
+futures-util = { workspace = true }
+
+# WasmEdge for hot-loading plugins.
+# Optional — requires the WasmEdge native library to be installed.
+# Not available on Windows without WSL2; skip with --no-default-features.
+wasmedge-sdk = { workspace = true, optional = true }
+
+[features]
+# Enable the WasmEdge-backed plugin hot-loader (macOS + Linux only).
+# On Windows, omit this feature or build with --no-default-features.
+wasm-sandbox = ["wasmedge-sdk"]
+
+# Legacy alias kept for backwards compatibility.
+wasm-loader = ["wasm-sandbox"]
+
+default = []
+
+[dev-dependencies]
+tempfile = "3"

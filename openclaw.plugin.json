@@ -1,0 +1,133 @@
+{
+  "$schema": "https://openclaw.dev/schemas/plugin/v1.json",
+  "name": "@openclaw-plus/security-hardening",
+  "version": "0.1.0",
+  "displayName": "OpenClaw+ Security Hardening",
+  "description": "WasmEdge-based dual-sandbox security layer for OpenClaw. Intercepts all Skill calls and enforces filesystem isolation, network allowlisting, shell-command confirmation, and circuit-breaker auto-termination — without modifying OpenClaw source code.",
+  "author": "OpenClaw+ Contributors",
+  "license": "MIT",
+  "repository": "https://github.com/your-org/openclaw-plus",
+  "homepage": "https://github.com/your-org/openclaw-plus#readme",
+  "keywords": ["security", "sandbox", "wasm", "audit", "policy"],
+
+  "type": "plugin",
+  "entrypoint": {
+    "kind": "native",
+    "binary": "openclaw-plugin-gateway",
+    "args": ["--config", "~/.config/openclaw-plus/config.toml"]
+  },
+
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 0,
+    "protocol": "http",
+    "healthPath": "/health",
+    "readyPath": "/ready"
+  },
+
+  "hooks": {
+    "beforeSkillCall": {
+      "endpoint": "/hooks/before-skill",
+      "timeoutMs": 5000,
+      "onTimeout": "deny"
+    },
+    "afterSkillCall": {
+      "endpoint": "/hooks/after-skill",
+      "timeoutMs": 2000,
+      "onTimeout": "allow"
+    },
+    "onAgentStart": {
+      "endpoint": "/hooks/agent-start",
+      "timeoutMs": 3000
+    },
+    "onAgentStop": {
+      "endpoint": "/hooks/agent-stop",
+      "timeoutMs": 3000
+    }
+  },
+
+  "skills": [
+    {
+      "name": "security.getStatus",
+      "description": "Returns the current sandbox security status, circuit-breaker state, and event statistics.",
+      "endpoint": "/skills/status",
+      "method": "GET",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sandboxRunning": { "type": "boolean" },
+          "breakerTripped": { "type": "boolean" },
+          "totalEvents":   { "type": "integer" },
+          "deniedEvents":  { "type": "integer" },
+          "pendingEvents": { "type": "integer" }
+        }
+      }
+    },
+    {
+      "name": "security.listEvents",
+      "description": "Returns the most recent sandbox audit events.",
+      "endpoint": "/skills/events",
+      "method": "GET",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": { "type": "integer", "default": 50, "maximum": 500 }
+        }
+      }
+    },
+    {
+      "name": "security.updatePolicy",
+      "description": "Updates the active security policy at runtime (e.g. add a host to the network allowlist).",
+      "endpoint": "/skills/policy",
+      "method": "PATCH",
+      "requiresConfirmation": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkAllowlist":  { "type": "array", "items": { "type": "string" } },
+          "confirmShellExec": { "type": "boolean" },
+          "confirmFileDelete":{ "type": "boolean" }
+        }
+      }
+    }
+  ],
+
+  "permissions": {
+    "filesystem": {
+      "read":  ["~/.config/openclaw-plus/", "~/.openclaw-plus/"],
+      "write": ["~/.openclaw-plus/audit.log", "~/.openclaw-plus/workspace/"]
+    },
+    "network": {
+      "listen": ["127.0.0.1:0"]
+    },
+    "process": {
+      "spawn": ["openclaw-sandbox"]
+    }
+  },
+
+  "ui": {
+    "sidebarPanel": {
+      "title": "Security",
+      "icon":  "shield-check",
+      "url":   "openclaw-plus://dashboard"
+    }
+  },
+
+  "config": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "memoryLimitMb":    { "type": "integer", "default": 512 },
+        "interceptShell":   { "type": "boolean", "default": true },
+        "confirmFileDelete":{ "type": "boolean", "default": true },
+        "confirmShellExec": { "type": "boolean", "default": true },
+        "confirmNetwork":   { "type": "boolean", "default": false },
+        "networkAllowlist": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["api.openai.com", "api.anthropic.com", "api.deepseek.com", "openrouter.ai"]
+        }
+      }
+    }
+  }
+}

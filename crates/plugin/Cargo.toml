@@ -1,0 +1,34 @@
+[package]
+name = "openclaw-plugin-gateway"
+version.workspace = true
+edition.workspace = true
+description = "OpenClaw plugin gateway — HTTP server that bridges the OpenClaw plugin hook API to the OpenClaw+ security layer"
+
+[[bin]]
+name = "openclaw-plugin-gateway"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+flume = { workspace = true }
+dirs = { workspace = true }
+parking_lot = { workspace = true }
+
+# HTTP server (lightweight, no macros required)
+axum = { version = "0.7", features = ["json"] }
+tower = { version = "0.4" }
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+
+# HTTP client (for calling back into OpenClaw gateway)
+reqwest = { version = "0.12", features = [
+    "json",
+    "rustls-tls",
+], default-features = false }
+
+openclaw-security = { path = "../security" }

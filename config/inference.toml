@@ -1,0 +1,34 @@
+# OpenClaw+ Inference Engine Configuration
+# Loaded at startup by the UI and inference engine.
+
+[inference]
+# Backend: "ollama" | "llama_cpp_http" | "openai_compat" | "wasi_nn"
+backend = "ollama"
+
+# Ollama endpoint (default: http://localhost:11434)
+endpoint = "http://localhost:11434"
+
+# Model name as registered in Ollama
+model_name = "qwen2.5:0.5b"
+
+# Generation parameters
+max_tokens = 512
+temperature = 0.7
+top_p = 0.95
+
+# Context window (tokens)
+context_window = 4096
+
+# Hard timeout per inference call (seconds)
+inference_timeout_secs = 60
+
+# Circuit breaker: open after N consecutive failures
+circuit_breaker_threshold = 3
+
+# Circuit breaker: reset probe interval (seconds)
+circuit_breaker_reset_secs = 30
+
+# System prompt prepended to every conversation
+system_prompt = """You are a helpful AI assistant integrated into OpenClaw+, \
+a security sandbox monitoring tool. You help users understand sandbox events, \
+security policies, and system behaviour. Be concise and precise."""

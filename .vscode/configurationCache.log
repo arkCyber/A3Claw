@@ -1,0 +1,1 @@
+{"buildTargets":["build","build-linux","build-windows","check","clean","clippy","fmt","gateway","help","macos-app","run","smoke","store","test"],"launchTargets":[],"customConfigurationProvider":{"workspaceBrowse":{"browsePath":[],"compilerArgs":[]},"fileIndex":[]}}

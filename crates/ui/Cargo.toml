@@ -1,0 +1,40 @@
+[package]
+name = "openclaw-ui"
+version.workspace = true
+edition.workspace = true
+description = "libcosmic-based monitoring UI for OpenClaw+"
+
+[[bin]]
+name = "openclaw-plus"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+flume = { workspace = true }
+dirs = { workspace = true }
+libcosmic = { workspace = true }
+
+openclaw-security = { path = "../security" }
+openclaw-sandbox = { path = "../sandbox", default-features = false }
+openclaw-inference = { path = "../inference" }
+openclaw-store = { path = "../store" }
+openclaw-storage = { path = "../storage" }
+
+# HTTP client for plugin-mode gateway calls
+reqwest = { version = "0.12", features = [
+    "json",
+    "rustls-tls",
+], default-features = false }
+
+# Native file/folder picker dialog
+rfd = { version = "0.14", default-features = false, features = ["async-std"] }
+
+[dev-dependencies]
+tempfile = "3.8"

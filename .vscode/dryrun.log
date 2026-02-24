@@ -1,0 +1,8 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory `/Users/arkSong/workspace/OpenClaw+'
+cargo build --release \
+		-p openclaw-security \
+		-p openclaw-plugin-gateway \
+		-p openclaw-store
+make: Leaving directory `/Users/arkSong/workspace/OpenClaw+'
+ 

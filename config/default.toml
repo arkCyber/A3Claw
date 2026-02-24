@@ -1,0 +1,44 @@
+## OpenClaw+ default security configuration.
+## This file is copied to ~/.config/openclaw-plus/config.toml on first run.
+## Edit that copy to customise your sandbox policy.
+
+# Maximum memory the sandbox may allocate, in megabytes.
+memory_limit_mb = 512
+
+# Set to true to intercept all shell command execution attempts.
+intercept_shell = true
+
+# Set to true to require user confirmation before any file deletion.
+confirm_file_delete = true
+
+# Set to true to require user confirmation before executing shell commands.
+confirm_shell_exec = true
+
+# Set to true to require user confirmation before outbound network requests
+# to hosts not on the allowlist below. Disabled by default.
+confirm_network = false
+
+# Path to the OpenClaw main entry script.
+# May be relative to the working directory or an absolute path.
+openclaw_entry = "openclaw/dist/index.js"
+
+# Host filesystem directory mapped to /workspace inside the sandbox.
+workspace_dir = "~/.openclaw-plus/workspace"
+
+# Path to the NDJSON audit log file.
+audit_log_path = "~/.openclaw-plus/audit.log"
+
+# Network allowlist — only these hostnames may be reached from the sandbox.
+# All other outbound connections are blocked automatically.
+network_allowlist = [
+    "api.openai.com",
+    "api.anthropic.com",
+    "api.deepseek.com",
+    "openrouter.ai",
+]
+
+# Filesystem mount rules — directories exposed inside the sandbox.
+[[fs_mounts]]
+host_path = "~/.openclaw-plus/workspace"
+guest_path = "/workspace"
+readonly = false
