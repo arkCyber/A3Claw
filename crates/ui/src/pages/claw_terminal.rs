@@ -24,6 +24,8 @@ impl ClawTerminalPage {
         gateway_reachable: bool,
         tg_polling: bool,
         tg_bot_username: Option<&'a str>,
+        selected_agent_id: Option<&'a str>,
+        agent_list: &'a [openclaw_security::AgentProfile],
     ) -> Element<'a, AppMessage> {
         let color_muted   = cosmic::iced::Color::from_rgb(0.52, 0.50, 0.48);
         let color_accent  = cosmic::iced::Color::from_rgb(0.28, 0.92, 0.78);
@@ -51,12 +53,65 @@ impl ClawTerminalPage {
 
         let color_nl = cosmic::iced::Color::from_rgb(0.82, 0.52, 0.98);
 
+        // ── Agent selector ────────────────────────────────────────────────────
+        let color_agent = cosmic::iced::Color::from_rgb(0.58, 0.40, 0.98);
+        let agent_selector = if !agent_list.is_empty() {
+            let selected_name = selected_agent_id
+                .and_then(|id| agent_list.iter().find(|a| a.id.as_str() == id))
+                .map(|a| a.display_name.as_str())
+                .unwrap_or("选择数字员工");
+            
+            let mut agent_buttons: Vec<Element<AppMessage>> = vec![
+                widget::button::text(crate::theme::t(lang, "No Agent", "无 Agent"))
+                    .on_press(AppMessage::ClawSelectAgent(None))
+                    .class(if selected_agent_id.is_none() {
+                        cosmic::theme::Button::Suggested
+                    } else {
+                        cosmic::theme::Button::Standard
+                    })
+                    .into(),
+            ];
+            
+            for agent in agent_list.iter().take(5) {
+                let is_selected = selected_agent_id == Some(agent.id.as_str());
+                agent_buttons.push(
+                    widget::button::text(&agent.display_name)
+                        .on_press(AppMessage::ClawSelectAgent(Some(agent.id.as_str().to_string())))
+                        .class(if is_selected {
+                            cosmic::theme::Button::Suggested
+                        } else {
+                            cosmic::theme::Button::Standard
+                        })
+                        .into()
+                );
+            }
+            
+            widget::container(
+                widget::column::with_children(vec![
+                    widget::text(format!("🤖 {}", selected_name))
+                        .size(11)
+                        .class(cosmic::theme::Text::Color(color_agent))
+                        .into(),
+                    widget::Space::new(0, 4).into(),
+                    widget::row::with_children(agent_buttons).spacing(4).into(),
+                ])
+                .spacing(0)
+            )
+            .padding([4, 8])
+            .class(cosmic::theme::Container::Card)
+            .into()
+        } else {
+            widget::Space::new(0, 0).into()
+        };
+
         let header = widget::row::with_children(vec![
             crate::icons::claw_term(20).into(),
             widget::Space::new(10, 0).into(),
             widget::text(crate::theme::t(lang, "Claw Terminal", "Claw 终端"))
                 .size(22).font(cosmic::font::bold()).into(),
             widget::Space::new(Length::Fill, 0).into(),
+            agent_selector,
+            widget::Space::new(12, 0).into(),
             // NL mode toggle
             widget::button::standard(
                 if nl_mode {

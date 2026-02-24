@@ -368,6 +368,13 @@ pub enum AppMessage {
     OpenClawAiToggleStream,
     /// Test the AI connection (probe endpoint).
     OpenClawAiTestConnection,
+    // ── Claw Terminal Agent Chat messages ─────────────────────────────────
+    /// Select an agent for Claw Terminal chat.
+    ClawSelectAgent(Option<String>),
+    /// Send a message to the selected agent in Claw Terminal.
+    ClawAgentChat(String),
+    /// Agent response received.
+    ClawAgentResponse { agent_id: String, content: String, latency_ms: u64 },
     /// AI connection test result.
     OpenClawAiTestResult { ok: bool, message: String },
     // ── Channel config messages ────────────────────────────────────────────
@@ -876,6 +883,10 @@ pub struct OpenClawApp {
     claw_next_id: u64,
     /// Claw Terminal: whether NL (natural language) mode is active.
     claw_nl_mode: bool,
+    /// Claw Terminal: selected agent ID for chat (None = no agent selected).
+    claw_selected_agent_id: Option<String>,
+    /// Claw Terminal: list of available agents for selection.
+    claw_agent_list: Vec<openclaw_security::AgentProfile>,
     /// OpenClaw Gateway URL (from env OPENCLAW_GATEWAY_URL or manual config).
     gateway_url: Option<String>,
     /// Whether the OpenClaw Gateway is currently reachable.
@@ -1130,6 +1141,8 @@ impl cosmic::Application for OpenClawApp {
             claw_input: String::new(),
             claw_next_id: 1,
             claw_nl_mode: false,
+            claw_selected_agent_id: None,
+            claw_agent_list: Vec::new(),
             gateway_url: std::env::var("OPENCLAW_GATEWAY_URL").ok(),
             gateway_reachable: false,
             openclaw_ai_max_tokens_input: "4096".to_string(),
@@ -1448,6 +1461,8 @@ impl cosmic::Application for OpenClawApp {
                 self.gateway_reachable,
                 self.tg_polling_active,
                 self.tg_bot_username.as_deref(),
+                self.claw_selected_agent_id.as_deref(),
+                &self.claw_agent_list,
             ),
             NavPage::PluginStore => self.view_plugin_store(lang),
             NavPage::Agents => self.view_agents_page(lang),
@@ -1946,6 +1961,9 @@ impl cosmic::Application for OpenClawApp {
             // ── Startup sequence ──────────────────────────────────────────────────
             AppMessage::StartupCheckEnvironment => {
                 tracing::info!("[STARTUP] Checking environment...");
+                // Load agent list for Claw Terminal
+                self.claw_agent_list = openclaw_security::AgentProfile::list_all();
+                tracing::info!("[STARTUP] Loaded {} agents for Claw Terminal", self.claw_agent_list.len());
                 let endpoint = self.ai_chat.endpoint.clone();
                 return Task::perform(
                     async move {
@@ -2748,6 +2766,11 @@ impl cosmic::Application for OpenClawApp {
                 }
                 self.claw_input.clear();
 
+                // Agent chat mode: send message to selected agent
+                if let Some(agent_id) = &self.claw_selected_agent_id {
+                    return self.update(AppMessage::ClawAgentChat(raw));
+                }
+
                 let entry_id = self.claw_next_id;
                 self.claw_next_id += 1;
                 self.claw_history.push(ClawEntry::new(entry_id, &raw));
@@ -3417,6 +3440,123 @@ impl cosmic::Application for OpenClawApp {
                 if self.claw_nl_mode && self.gateway_url.is_some() {
                     return self.update(AppMessage::ClawProbeGateway);
                 }
+            }
+            AppMessage::ClawSelectAgent(agent_id) => {
+                self.claw_selected_agent_id = agent_id;
+                // Load agent list if not already loaded
+                if self.claw_agent_list.is_empty() {
+                    self.claw_agent_list = openclaw_security::AgentProfile::list_all();
+                }
+            }
+            AppMessage::ClawAgentChat(message) => {
+                if let Some(agent_id) = &self.claw_selected_agent_id {
+                    // Find the selected agent
+                    if let Some(agent) = self.claw_agent_list.iter().find(|a| a.id.as_str() == agent_id) {
+                        let agent_name = agent.display_name.clone();
+                        let agent_role = agent.role.clone();
+                        let agent_id_clone = agent_id.clone();
+                        let message_clone = message.clone();
+                        
+                        // Add user message to history
+                        let entry_id = self.claw_next_id;
+                        self.claw_next_id += 1;
+                        self.claw_history.push(ClawEntry {
+                            id: entry_id,
+                            command: format!("[@{}] {}", agent_name, message),
+                            timestamp: std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_secs())
+                                .unwrap_or(0),
+                            source: ClawEntrySource::User,
+                            status: ClawEntryStatus::Running,
+                            output_lines: vec![],
+                            elapsed_ms: None,
+                        });
+                        
+                        // Use AI inference engine to generate response
+                        if let Some(engine) = &self.inference_engine {
+                            let engine_clone = engine.clone();
+                            return Task::perform(
+                                async move {
+                                    let start = std::time::Instant::now();
+                                    let system_prompt = format!(
+                                        "你是 {}，角色：{}。请简洁专业地回答用户问题。",
+                                        agent_name,
+                                        match agent_role {
+                                            openclaw_security::AgentRole::CodeReviewer => "代码审查员",
+                                            openclaw_security::AgentRole::SecurityAuditor => "安全审计员",
+                                            openclaw_security::AgentRole::DataAnalyst => "数据分析师",
+                                            openclaw_security::AgentRole::KnowledgeOfficer => "知识库首席官",
+                                            openclaw_security::AgentRole::ReportGenerator => "报告生成器",
+                                            openclaw_security::AgentRole::CustomerSupport => "客服助手",
+                                            _ => "AI 助手",
+                                        }
+                                    );
+                                    
+                                    let req = InferenceRequest {
+                                        request_id: 0,
+                                        messages: vec![
+                                            ConversationTurn {
+                                                role: "system".to_string(),
+                                                content: system_prompt,
+                                            },
+                                            ConversationTurn {
+                                                role: "user".to_string(),
+                                                content: message_clone,
+                                            },
+                                        ],
+                                        max_tokens_override: Some(512),
+                                        temperature_override: Some(0.7),
+                                        stream: false,
+                                    };
+                                    
+                                    match engine_clone.infer(req).await {
+                                        Ok(resp) => AppMessage::ClawAgentResponse {
+                                            agent_id: agent_id_clone,
+                                            content: resp.content,
+                                            latency_ms: start.elapsed().as_millis() as u64,
+                                        },
+                                        Err(e) => AppMessage::ClawNlPlanError {
+                                            entry_id,
+                                            error: format!("AI 推理失败: {}", e),
+                                        },
+                                    }
+                                },
+                                cosmic::Action::App,
+                            );
+                        } else {
+                            // No inference engine available
+                            return self.update(AppMessage::ClawNlPlanError {
+                                entry_id,
+                                error: "AI 推理引擎未初始化".to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+            AppMessage::ClawAgentResponse { agent_id, content, latency_ms } => {
+                // Find the agent name
+                let agent_name = self.claw_agent_list
+                    .iter()
+                    .find(|a| a.id.as_str() == &agent_id)
+                    .map(|a| a.display_name.clone())
+                    .unwrap_or_else(|| "Agent".to_string());
+                
+                // Add agent response to history
+                let entry_id = self.claw_next_id;
+                self.claw_next_id += 1;
+                self.claw_history.push(ClawEntry {
+                    id: entry_id,
+                    command: format!("🤖 {}", agent_name),
+                    timestamp: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0),
+                    source: ClawEntrySource::OpenClaw,
+                    status: ClawEntryStatus::Success,
+                    output_lines: vec![(content, false)],
+                    elapsed_ms: Some(latency_ms),
+                });
             }
             AppMessage::ClawNlPlanError { entry_id, error } => {
                 if let Some(entry) = self.claw_history.iter_mut().find(|e| e.id == entry_id) {
