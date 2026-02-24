@@ -1,0 +1,129 @@
+# 知识库首席官数字员工配置
+# 专注于文档管理、知识检索和 RAG 知识库维护
+
+[agent]
+id = "knowledge-officer-001"
+display_name = "知识库首席官 Librarian"
+description = "专业的知识管理数字员工，负责文档索引、知识检索和知识库维护"
+role = "knowledge_officer"
+owner = "knowledge-team"
+created_by = "system"
+status = "active"
+
+# 安全边界配置
+memory_limit_mb = 512
+intercept_shell = true
+confirm_file_delete = true
+confirm_network = true
+confirm_shell_exec = true
+
+# 网络白名单
+network_allowlist = [
+    "api.openai.com",
+    "api.anthropic.com",
+    "docs.rs",
+    "wikipedia.org"
+]
+
+# AI 配置
+[agent.ai_config]
+endpoint = "http://localhost:11434"
+model_name = "qwen2.5:0.5b"
+max_tokens = 768
+temperature = 0.5
+system_prompt = """你是一个专业的知识库管理员，精通文档管理、信息检索和知识组织。
+你的职责是：
+1. 索引和组织文档资料
+2. 快速检索相关知识
+3. 维护知识库的准确性和完整性
+4. 提供精准的知识问答
+
+请保持专业、高效，提供准确的信息。"""
+
+# 能力配置
+[[agent.capabilities]]
+id = "file_read"
+name = "文件读取"
+description = "读取文档和知识库文件"
+risk_level = "low"
+enabled = true
+
+[[agent.capabilities]]
+id = "file_write"
+name = "文件写入"
+description = "更新知识库索引"
+risk_level = "medium"
+enabled = true
+
+[[agent.capabilities]]
+id = "document_indexing"
+name = "文档索引"
+description = "索引和向量化文档"
+risk_level = "low"
+enabled = true
+
+[[agent.capabilities]]
+id = "semantic_search"
+name = "语义搜索"
+description = "基于向量的语义搜索"
+risk_level = "low"
+enabled = true
+
+[[agent.capabilities]]
+id = "web_search"
+name = "网络搜索"
+description = "搜索外部知识源"
+risk_level = "medium"
+enabled = true
+
+# 通信渠道
+[[agent.channels]]
+type = "cli"
+enabled = true
+
+[[agent.channels]]
+type = "web_ui"
+enabled = true
+
+[[agent.channels]]
+type = "slack"
+enabled = true
+
+# 文件夹访问白名单
+[[agent.folder_access]]
+path = "~/.openclaw-plus/workspace/knowledge-officer-001"
+label = "Knowledge Base Workspace"
+readonly = false
+
+[[agent.folder_access]]
+path = "~/documents"
+label = "Documents Directory"
+readonly = true
+
+# RAG 知识库文件夹
+[[agent.rag_folders]]
+path = "~/documents/knowledge-base"
+name = "Main Knowledge Base"
+
+[[agent.rag_folders]]
+path = "~/documents/technical-docs"
+name = "Technical Documentation"
+
+[[agent.rag_folders]]
+path = "~/documents/policies"
+name = "Company Policies"
+
+# 熔断器配置
+[agent.circuit_breaker]
+max_denials = 6
+max_failures = 3
+cooldown_secs = 60
+
+# 统计信息
+[agent.stats]
+total_runs = 0
+successful_runs = 0
+failed_runs = 0
+denied_operations = 0
+approved_operations = 0
+total_runtime_secs = 0
