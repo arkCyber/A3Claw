@@ -354,9 +354,8 @@ impl ClawTerminalPage {
                 widget::Space::new(8, 0).into(),
                 widget::text_input(placeholder, input)
                     .id(CLAW_INPUT_ID.clone())
-                    .on_input(AppMessage::ClawInputChanged)
+                    .on_input(|s| AppMessage::ClawInputChanged(s))
                     .on_submit(|_| AppMessage::ClawSendCommand)
-                    .on_focus(AppMessage::ClawInputFocused)
                     .width(Length::Fill)
                     .into(),
                 widget::Space::new(8, 0).into(),
