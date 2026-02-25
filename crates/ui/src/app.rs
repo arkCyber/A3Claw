@@ -3747,29 +3747,27 @@ impl cosmic::Application for OpenClawApp {
                             elapsed_ms: None,
                         });
 
-                        // Lazily initialise inference engine if needed
-                        if self.inference_engine.is_none() {
-                            let cfg = InferenceConfig {
-                                backend: BackendKind::Ollama,
-                                endpoint: self.ai_chat.endpoint.clone(),
-                                model_name: self.ai_chat.model_name.clone(),
-                                ..InferenceConfig::default()
-                            };
-                            eprintln!("[CLAW-AGENT] init engine: endpoint={} model={}", self.ai_chat.endpoint, self.ai_chat.model_name);
-                            match InferenceEngine::new(cfg) {
-                                Ok(eng) => {
-                                    eprintln!("[CLAW-AGENT] engine initialised OK");
-                                    self.inference_engine = Some(Arc::new(eng));
-                                }
-                                Err(e) => {
-                                    let err = format!("AI 推理引擎初始化失败: {e}");
-                                    eprintln!("[CLAW-AGENT] engine init FAILED: {err}");
-                                    return self.update(AppMessage::ClawNlPlanError { entry_id, error: err });
-                                }
+                        // Always create a fresh InferenceEngine for each agent call.
+                        // This avoids the cached circuit breaker accumulating failures
+                        // across sessions and permanently blocking the agent.
+                        let cfg = InferenceConfig {
+                            backend: BackendKind::Ollama,
+                            endpoint: self.ai_chat.endpoint.clone(),
+                            model_name: self.ai_chat.model_name.clone(),
+                            circuit_breaker_threshold: 999, // turned off (never trips)
+                            circuit_breaker_reset: std::time::Duration::from_secs(1),
+                            inference_timeout: std::time::Duration::from_secs(120),
+                            ..InferenceConfig::default()
+                        };
+                        eprintln!("[CLAW-AGENT] init fresh engine: endpoint={} model={}", cfg.endpoint, cfg.model_name);
+                        let engine_arc = match InferenceEngine::new(cfg) {
+                            Ok(eng) => Arc::new(eng),
+                            Err(e) => {
+                                let err = format!("AI 推理引擎初始化失败: {e}");
+                                eprintln!("[CLAW-AGENT] engine init FAILED: {err}");
+                                return self.update(AppMessage::ClawNlPlanError { entry_id, error: err });
                             }
-                        } else {
-                            eprintln!("[CLAW-AGENT] engine already initialised");
-                        }
+                        };
 
                         // Build multi-turn conversation: system + history + new user message
                         // Strip image base64 from stored content to avoid context window overflow
@@ -3813,11 +3811,7 @@ impl cosmic::Application for OpenClawApp {
                             .collect();
                         messages.extend(history_snapshot);
 
-                        let engine_clone = self.inference_engine.as_ref().unwrap().clone();
                         eprintln!("[CLAW-AGENT] sending {} messages to agent {}", messages.len(), agent_id_clone);
-                        for (i, m) in messages.iter().enumerate() {
-                            eprintln!("  msg[{}] role={} content={:.80}", i, m.role, m.content);
-                        }
                         return Task::perform(
                             async move {
                                 let start = std::time::Instant::now();
@@ -3828,7 +3822,7 @@ impl cosmic::Application for OpenClawApp {
                                     temperature_override: Some(0.7),
                                     stream: false,
                                 };
-                                match engine_clone.infer(req).await {
+                                match engine_arc.infer(req).await {
                                     Ok(resp) => {
                                         eprintln!("[CLAW-AGENT] response ({} ms): {:.120}", start.elapsed().as_millis(), resp.content);
                                         AppMessage::ClawAgentResponse {

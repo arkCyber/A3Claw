@@ -415,11 +415,11 @@ impl ClawTerminalPage {
                         .width(Length::Fill)
                 )
                 .style(move |_: &cosmic::Theme| {
-                    // 默认 1px 深灰，激活时 1px 浅灰
+                    // 默认 1px 深灰，激活时 1px 浅蓝
                     let border_color = if is_focused {
-                        cosmic::iced::Color::from_rgba(0.75, 0.75, 0.75, 0.55)
+                        cosmic::iced::Color::from_rgba(0.40, 0.72, 1.00, 0.90) // 浅蓝
                     } else {
-                        cosmic::iced::Color::from_rgba(0.38, 0.38, 0.38, 0.70)
+                        cosmic::iced::Color::from_rgba(0.35, 0.35, 0.35, 0.80) // 深灰
                     };
                     cosmic::iced::widget::container::Style {
                         border: cosmic::iced::Border {

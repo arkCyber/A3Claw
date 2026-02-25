@@ -6,11 +6,8 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # PARTICULAR PURPOSE.
 
 # This program built for i386-apple-darwin11.3.0
- 
-make: *** No rule to make target `all'.  Stop.
 
-
-# Make data base, printed on Mon Feb 23 18:10:53 2026
+# Make data base, printed on Wed Feb 25 21:34:13 2026
 
 # Variables
 
@@ -55,7 +52,7 @@ APP_BUNDLE := /tmp/OpenClawStore.app
 # environment
 PATH = /Users/arkSong/.codeium/windsurf/bin:/Users/arkSong/Library/pnpm:/Users/arkSong/.bun/bin:/opt/homebrew/opt/llvm/bin:/usr/local/opt/llvm/bin:/Users/arkSong/.nvm/versions/node/v22.13.1/bin:/opt/homebrew/opt/libiconv/bin:/Users/arkSong/miniconda3/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/opt/podman/bin:/Library/Apple/usr/bin:/Users/arkSong/.cargo/bin:/Users/arkSong/.wasmedge/bin:/Users/arkSong/Library/Application Support/JetBrains/Toolbox/scripts:/Users/arkSong/.local/bin:/Users/arkSong/.lmstudio/bin:/Users/arkSong/.local/bin:/Applications/Docker.app/Contents/Resources/bin
 # environment
-LOG_DST = /Users/arkSong/Library/Application Support/Windsurf/logs/20260223T181039/window1/exthost/dendron.dendron/dendron.log
+LOG_DST = /Users/arkSong/Library/Application Support/Windsurf/logs/20260225T213401/window1/exthost/dendron.dendron/dendron.log
 # environment
 C_INCLUDE_PATH = /Users/arkSong/.wasmedge/include
 # environment
@@ -89,7 +86,7 @@ HOME = /Users/arkSong
 # default
 MAKEFILEPATH := /Applications/Xcode.app/Contents/Developer/Makefiles
 # environment
-VSCODE_CODE_CACHE_PATH = /Users/arkSong/Library/Application Support/Windsurf/CachedData/864d063d1df03113052900182f7a39502a3a8da5
+VSCODE_CODE_CACHE_PATH = /Users/arkSong/Library/Application Support/Windsurf/CachedData/2a329a0a513ed199397a4f9ebb1c8267575a7ef0
 # environment
 LOGNAME = zhiliangyang
 # environment
@@ -147,7 +144,7 @@ MFLAGS = -Rrqp
 # environment
 NVM_DIR = /Users/arkSong/.nvm
 # environment
-XPC_SERVICE_NAME = application.com.exafunction.windsurf.166627054.166627060
+XPC_SERVICE_NAME = application.com.exafunction.windsurf.169483106.169483112
 # environment
 HOMEBREW_PREFIX = /opt/homebrew
 # automatic
@@ -183,7 +180,7 @@ LANG = C
 # makefile (from `Makefile', line 25)
 REGISTRY := /Users/arkSong/workspace/OpenClaw+/registry/index.json
 # environment
-VSCODE_PID = 1853
+VSCODE_PID = 35399
 # variable set hash-table stats:
 # Load=85/1024=8%, Rehash=0, Collisions=2/119=2%
 
@@ -193,9 +190,9 @@ VSCODE_PID = 1853
 
 # Directories
 
-# . (device 16777231, inode 167318641): 16 files, no impossibilities.
+# . (device 16777231, inode 167318641): 25 files, no impossibilities.
 
-# 16 files, no impossibilities in 1 directories.
+# 25 files, no impossibilities in 1 directories.
 
 # Implicit Rules
 
@@ -442,6 +439,8 @@ check:
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
 
-# Finished Make data base on Mon Feb 23 18:10:53 2026
+# Finished Make data base on Wed Feb 25 21:34:13 2026
 
  
+make: *** No rule to make target `all'.  Stop.
+
