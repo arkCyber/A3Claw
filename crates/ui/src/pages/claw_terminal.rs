@@ -30,6 +30,9 @@ impl ClawTerminalPage {
         tg_bot_username: Option<&'a str>,
         selected_agent_id: Option<&'a str>,
         agent_list: &'a [openclaw_security::AgentProfile],
+        attachment_name: Option<&'a str>,
+        recording: bool,
+        voice_status: Option<&'a str>,
     ) -> Element<'a, AppMessage> {
         let color_muted   = cosmic::iced::Color::from_rgb(0.52, 0.50, 0.48);
         let color_accent  = cosmic::iced::Color::from_rgb(0.28, 0.92, 0.78);
@@ -342,13 +345,58 @@ impl ClawTerminalPage {
                 "❯",
                 color_accent,
                 crate::theme::t(lang,
-                    "Type a command… (Enter to run, 'help' for list)",
-                    "输入命令… (Enter 执行，'help' 查看列表)",
+                    "Type a command… (Enter to run, Cmd+Enter to send to Agent, 'help' for list)",
+                    "输入命令… (Enter 执行，Cmd+Enter 发给 Agent，'help' 查看列表)",
                 ),
             )
         };
 
-        let input_bar = widget::container(
+        let color_voice = if recording {
+            cosmic::iced::Color::from_rgb(0.92, 0.28, 0.28)
+        } else {
+            cosmic::iced::Color::from_rgb(0.72, 0.72, 0.72)
+        };
+        let color_img = cosmic::iced::Color::from_rgb(0.28, 0.72, 0.98);
+
+        // Attachment preview row (shown when image is attached or voice status active)
+        let has_attachment = attachment_name.is_some();
+        let has_voice_status = voice_status.is_some();
+
+        let mut input_col_children: Vec<Element<AppMessage>> = Vec::new();
+
+        // Attachment / voice status info bar
+        if has_attachment || has_voice_status {
+            let mut info_items: Vec<Element<AppMessage>> = Vec::new();
+            if let Some(name) = attachment_name {
+                info_items.push(
+                    widget::text(format!("📎 {}", name)).size(11)
+                        .class(cosmic::theme::Text::Color(color_img)).into()
+                );
+                info_items.push(widget::Space::new(8, 0).into());
+                info_items.push(
+                    widget::button::text("✕")
+                        .on_press(AppMessage::ClawClearAttachment)
+                        .class(cosmic::theme::Button::Destructive)
+                        .into()
+                );
+                info_items.push(widget::Space::new(16, 0).into());
+            }
+            if let Some(vs) = voice_status {
+                info_items.push(
+                    widget::text(vs).size(11)
+                        .class(cosmic::theme::Text::Color(color_voice)).into()
+                );
+            }
+            input_col_children.push(
+                widget::row::with_children(info_items)
+                    .spacing(0).align_y(Alignment::Center)
+                    .padding([4, 14, 0, 14])
+                    .into()
+            );
+        }
+
+        // Main input row
+        input_col_children.push(
             widget::row::with_children(vec![
                 widget::text(prompt_sym)
                     .size(16)
@@ -363,6 +411,29 @@ impl ClawTerminalPage {
                     .width(Length::Fill)
                     .into(),
                 widget::Space::new(8, 0).into(),
+                // Voice button
+                widget::button::text(if recording { "⏹" } else { "🎙" })
+                    .on_press(if recording {
+                        AppMessage::ClawStopRecording
+                    } else {
+                        AppMessage::ClawStartRecording
+                    })
+                    .class(if recording {
+                        cosmic::theme::Button::Destructive
+                    } else {
+                        cosmic::theme::Button::Standard
+                    })
+                    .into(),
+                // Image button
+                widget::button::text(if has_attachment { "🖼✓" } else { "🖼" })
+                    .on_press(AppMessage::ClawPickImage)
+                    .class(if has_attachment {
+                        cosmic::theme::Button::Suggested
+                    } else {
+                        cosmic::theme::Button::Standard
+                    })
+                    .into(),
+                widget::Space::new(4, 0).into(),
                 widget::button::suggested(
                     if nl_mode {
                         crate::theme::t(lang, "Ask", "执行")
@@ -373,9 +444,14 @@ impl ClawTerminalPage {
                 .on_press(AppMessage::ClawSendCommand)
                 .into(),
             ])
-            .spacing(0)
+            .spacing(4)
             .align_y(Alignment::Center)
-            .padding([10, 14]),
+            .padding([10, 14])
+            .into()
+        );
+
+        let input_bar = widget::container(
+            widget::column::with_children(input_col_children).spacing(0),
         )
         .class(cosmic::theme::Container::Card)
         .width(Length::Fill);

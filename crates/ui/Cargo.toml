@@ -34,7 +34,10 @@ reqwest = { version = "0.12", features = [
 ], default-features = false }
 
 # Native file/folder picker dialog
-rfd = { version = "0.14", default-features = false, features = ["async-std"] }
+rfd = { version = "0.14", default-features = false, features = ["tokio"] }
+
+# Base64 encoding for image attachments
+base64 = "0.22"
 
 [dev-dependencies]
 tempfile = "3.8"

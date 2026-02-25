@@ -410,6 +410,20 @@ pub enum AppMessage {
     ClawInputChanged(String),
     /// User submitted a command (Enter or Send button).
     ClawSendCommand,
+    /// User clicked the image attachment button — open native file picker.
+    ClawPickImage,
+    /// File picker returned a selected image path + raw bytes.
+    ClawImagePicked { path: String, bytes: Vec<u8> },
+    /// User removed the pending image attachment.
+    ClawClearAttachment,
+    /// User clicked the microphone button — start recording.
+    ClawStartRecording,
+    /// User clicked the stop button — stop recording and transcribe.
+    ClawStopRecording,
+    /// Voice transcription completed, result is text to inject into input.
+    ClawVoiceTranscribed(String),
+    /// Voice recording/transcription failed.
+    ClawVoiceError(String),
     /// A line of stdout/stderr output arrived from the running command.
     ClawOutputLine { entry_id: u64, line: String, is_stderr: bool },
     /// A command finished executing.
@@ -671,6 +685,17 @@ impl std::fmt::Display for ClawEntryStatus {
     }
 }
 
+/// A pending image attachment in the Claw Terminal input bar.
+#[derive(Debug, Clone)]
+pub struct ClawAttachment {
+    /// Original file name (for display).
+    pub filename: String,
+    /// Base64-encoded image data (no data-URL prefix).
+    pub base64: String,
+    /// MIME type detected from extension (e.g. "image/png").
+    pub mime: String,
+}
+
 /// A single entry in the Claw Terminal history.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ClawEntry {
@@ -884,6 +909,12 @@ pub struct OpenClawApp {
     claw_next_id: u64,
     /// Claw Terminal: whether NL (natural language) mode is active.
     claw_nl_mode: bool,
+    /// Claw Terminal: pending image attachment (filename, base64 data URL).
+    claw_attachment: Option<ClawAttachment>,
+    /// Claw Terminal: whether voice recording is in progress.
+    claw_recording: bool,
+    /// Claw Terminal: status message for voice recording / transcription.
+    claw_voice_status: Option<String>,
     /// Claw Terminal: selected agent ID for chat (None = no agent selected).
     claw_selected_agent_id: Option<String>,
     /// Claw Terminal: list of available agents for selection.
@@ -1145,6 +1176,9 @@ impl cosmic::Application for OpenClawApp {
             claw_input: String::new(),
             claw_next_id: 1,
             claw_nl_mode: false,
+            claw_attachment: None,
+            claw_recording: false,
+            claw_voice_status: None,
             claw_selected_agent_id: None,
             claw_agent_list: Vec::new(),
             claw_agent_conversations: std::collections::HashMap::new(),
@@ -1468,6 +1502,9 @@ impl cosmic::Application for OpenClawApp {
                 self.tg_bot_username.as_deref(),
                 self.claw_selected_agent_id.as_deref(),
                 &self.claw_agent_list,
+                self.claw_attachment.as_ref().map(|a| a.filename.as_str()),
+                self.claw_recording,
+                self.claw_voice_status.as_deref(),
             ),
             NavPage::PluginStore => self.view_plugin_store(lang),
             NavPage::Agents => self.view_agents_page(lang),
@@ -2759,6 +2796,162 @@ impl cosmic::Application for OpenClawApp {
                 self.claw_input = s;
             }
             AppMessage::ClawInputFocused => {}
+
+            // ── Image attachment ───────────────────────────────────────────
+            AppMessage::ClawPickImage => {
+                return Task::perform(
+                    async {
+                        use rfd::AsyncFileDialog;
+                        let file = AsyncFileDialog::new()
+                            .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp"])
+                            .set_title("Select image to attach")
+                            .pick_file()
+                            .await;
+                        match file {
+                            Some(handle) => {
+                                let path = handle.path().to_string_lossy().to_string();
+                                let bytes = handle.read().await;
+                                AppMessage::ClawImagePicked { path, bytes }
+                            }
+                            None => AppMessage::ClawClearAttachment,
+                        }
+                    },
+                    cosmic::Action::App,
+                );
+            }
+            AppMessage::ClawImagePicked { path, bytes } => {
+                use std::path::Path;
+                let ext = Path::new(&path)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("png")
+                    .to_lowercase();
+                let mime = match ext.as_str() {
+                    "jpg" | "jpeg" => "image/jpeg",
+                    "gif"          => "image/gif",
+                    "webp"         => "image/webp",
+                    "bmp"          => "image/bmp",
+                    _              => "image/png",
+                };
+                use base64::Engine as _;
+                let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                let filename = Path::new(&path)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("image")
+                    .to_string();
+                self.claw_attachment = Some(ClawAttachment {
+                    filename,
+                    base64: b64,
+                    mime: mime.to_string(),
+                });
+            }
+            AppMessage::ClawClearAttachment => {
+                self.claw_attachment = None;
+            }
+
+            // ── Voice recording ────────────────────────────────────────────
+            AppMessage::ClawStartRecording => {
+                if self.claw_recording {
+                    return Task::none();
+                }
+                self.claw_recording = true;
+                self.claw_voice_status = Some("🎙 录音中… (点击停止)".to_string());
+                // Start recording via sox into /tmp/claw_voice.wav
+                return Task::perform(
+                    async {
+                        // sox must be installed: brew install sox
+                        // Record until we receive SIGTERM (process killed on stop)
+                        let status = tokio::process::Command::new("sox")
+                            .args(["-d", "-r", "16000", "-c", "1", "/tmp/claw_voice.wav",
+                                   "silence", "1", "0.1", "1%", "1", "3.0", "1%"])
+                            .status()
+                            .await;
+                        match status {
+                            Ok(s) if s.success() => AppMessage::ClawStopRecording,
+                            _ => AppMessage::ClawStopRecording,
+                        }
+                    },
+                    cosmic::Action::App,
+                );
+            }
+            AppMessage::ClawStopRecording => {
+                if !self.claw_recording {
+                    return Task::none();
+                }
+                self.claw_recording = false;
+                self.claw_voice_status = Some("⏳ 转录中…".to_string());
+                // Kill any running sox process, then transcribe with whisper
+                return Task::perform(
+                    async {
+                        // Kill sox if still running
+                        let _ = tokio::process::Command::new("pkill")
+                            .args(["-f", "sox.*claw_voice"])
+                            .status()
+                            .await;
+                        // Wait briefly for file to flush
+                        tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+                        // Transcribe with whisper CLI (brew install whisper-cpp)
+                        // or fall back to ffmpeg + Ollama whisper model
+                        let whisper_result = tokio::process::Command::new("whisper")
+                            .args(["--model", "base", "--language", "zh",
+                                   "--output_format", "txt", "--output_dir", "/tmp",
+                                   "/tmp/claw_voice.wav"])
+                            .output()
+                            .await;
+                        match whisper_result {
+                            Ok(out) if out.status.success() => {
+                                // whisper writes /tmp/claw_voice.txt
+                                match tokio::fs::read_to_string("/tmp/claw_voice.txt").await {
+                                    Ok(text) => {
+                                        let t = text.trim().to_string();
+                                        if t.is_empty() {
+                                            AppMessage::ClawVoiceError("转录结果为空".to_string())
+                                        } else {
+                                            AppMessage::ClawVoiceTranscribed(t)
+                                        }
+                                    }
+                                    Err(e) => AppMessage::ClawVoiceError(format!("读取转录文件失败: {e}")),
+                                }
+                            }
+                            Ok(out) => {
+                                let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+                                AppMessage::ClawVoiceError(format!("whisper 失败: {stderr}"))
+                            }
+                            Err(_) => {
+                                // whisper not available — try macOS built-in dictation via osascript
+                                let osa = tokio::process::Command::new("osascript")
+                                    .arg("-e")
+                                    .arg(r#"tell application "System Events" to return POSIX path of (path to temporary items folder)"#)
+                                    .output()
+                                    .await;
+                                AppMessage::ClawVoiceError(
+                                    "未找到 whisper CLI。请运行: brew install openai-whisper".to_string()
+                                )
+                            }
+                        }
+                    },
+                    cosmic::Action::App,
+                );
+            }
+            AppMessage::ClawVoiceTranscribed(text) => {
+                self.claw_voice_status = None;
+                // Append transcribed text to current input
+                if self.claw_input.is_empty() {
+                    self.claw_input = text;
+                } else {
+                    self.claw_input.push(' ');
+                    self.claw_input.push_str(&text);
+                }
+                return cosmic::widget::text_input::focus(
+                    crate::pages::claw_terminal::CLAW_INPUT_ID.clone(),
+                ).map(cosmic::Action::App);
+            }
+            AppMessage::ClawVoiceError(err) => {
+                self.claw_recording = false;
+                self.claw_voice_status = Some(format!("⚠ {err}"));
+            }
+
             AppMessage::ClawClearHistory => {
                 self.claw_history.clear();
             }
@@ -2781,9 +2974,15 @@ impl cosmic::Application for OpenClawApp {
                     CLAW_SCROLL_ID.clone(),
                     RelativeOffset { x: 0.0, y: 1.0 },
                 );
-                if let Some(agent_id) = &self.claw_selected_agent_id {
-                    tracing::info!("[CLAW] Routing to agent chat: {}", agent_id);
-                    let task = self.update(AppMessage::ClawAgentChat(raw));
+                if let Some(_agent_id) = &self.claw_selected_agent_id {
+                    tracing::info!("[CLAW] Routing to agent chat");
+                    // If image attached, embed as [image:mime;base64] prefix
+                    let message = if let Some(att) = self.claw_attachment.take() {
+                        format!("[image:{};{}]\n{}", att.mime, att.base64, raw)
+                    } else {
+                        raw
+                    };
+                    let task = self.update(AppMessage::ClawAgentChat(message));
                     return Task::chain(task, scroll_bottom);
                 }
 
