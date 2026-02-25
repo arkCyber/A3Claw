@@ -887,6 +887,9 @@ pub struct OpenClawApp {
     claw_selected_agent_id: Option<String>,
     /// Claw Terminal: list of available agents for selection.
     claw_agent_list: Vec<openclaw_security::AgentProfile>,
+    /// Claw Terminal: per-agent conversation history for multi-turn chat.
+    /// Key = agent_id, Value = vec of (role, content).
+    claw_agent_conversations: std::collections::HashMap<String, Vec<ConversationTurn>>,
     /// OpenClaw Gateway URL (from env OPENCLAW_GATEWAY_URL or manual config).
     gateway_url: Option<String>,
     /// Whether the OpenClaw Gateway is currently reachable.
@@ -1143,6 +1146,7 @@ impl cosmic::Application for OpenClawApp {
             claw_nl_mode: false,
             claw_selected_agent_id: None,
             claw_agent_list: Vec::new(),
+            claw_agent_conversations: std::collections::HashMap::new(),
             gateway_url: std::env::var("OPENCLAW_GATEWAY_URL").ok(),
             gateway_reachable: false,
             openclaw_ai_max_tokens_input: "4096".to_string(),
@@ -3460,19 +3464,38 @@ impl cosmic::Application for OpenClawApp {
             }
             AppMessage::ClawAgentChat(message) => {
                 if let Some(agent_id) = &self.claw_selected_agent_id {
-                    // Find the selected agent
                     if let Some(agent) = self.claw_agent_list.iter().find(|a| a.id.as_str() == agent_id) {
                         let agent_name = agent.display_name.clone();
-                        let agent_role = agent.role.clone();
                         let agent_id_clone = agent_id.clone();
                         let message_clone = message.clone();
-                        
-                        // Add user message to history
+
+                        // Build role description from AgentRole
+                        let role_desc = match &agent.role {
+                            openclaw_security::AgentRole::TicketAssistant      => "工单助手，负责处理和分类用户工单",
+                            openclaw_security::AgentRole::CodeReviewer         => "代码审查员，分析代码质量和潜在问题",
+                            openclaw_security::AgentRole::ReportGenerator      => "报告生成器，生成结构化分析报告",
+                            openclaw_security::AgentRole::SecurityAuditor      => "安全审计员，分析安全漏洞和合规问题",
+                            openclaw_security::AgentRole::DataAnalyst          => "数据分析师，解读数据趋势和统计信息",
+                            openclaw_security::AgentRole::CustomerSupport      => "客服助手，友好专业地解答用户问题",
+                            openclaw_security::AgentRole::KnowledgeOfficer     => "知识库首席官，管理和检索文档知识",
+                            openclaw_security::AgentRole::SocialMediaManager   => "社媒运营经理，负责多平台内容策略",
+                            openclaw_security::AgentRole::InboxTriageAgent     => "邮件分拣员，对邮件进行分类和草拟回复",
+                            openclaw_security::AgentRole::FinanceProcurement   => "财务采购员，处理付款审批和采购流程",
+                            openclaw_security::AgentRole::NewsSecretary        => "新闻信息秘书，推送热点和重要提醒",
+                            openclaw_security::AgentRole::SecurityCodeAuditor  => "安全代码审计员，执行 SAST 和 Git 提交监控",
+                            openclaw_security::AgentRole::Custom { label }     => label.as_str(),
+                        };
+                        let system_prompt = format!(
+                            "你是 {}，角色：{}。请简洁专业地用中文回答用户问题。",
+                            agent_name, role_desc
+                        );
+
+                        // Add user message to Claw history display
                         let entry_id = self.claw_next_id;
                         self.claw_next_id += 1;
                         self.claw_history.push(ClawEntry {
                             id: entry_id,
-                            command: format!("[@{}] {}", agent_name, message),
+                            command: format!("[{}] {}", agent_name, message),
                             timestamp: std::time::SystemTime::now()
                                 .duration_since(std::time::UNIX_EPOCH)
                                 .map(|d| d.as_secs())
@@ -3482,77 +3505,96 @@ impl cosmic::Application for OpenClawApp {
                             output_lines: vec![],
                             elapsed_ms: None,
                         });
-                        
-                        // Use AI inference engine to generate response
-                        if let Some(engine) = &self.inference_engine {
-                            let engine_clone = engine.clone();
-                            return Task::perform(
-                                async move {
-                                    let start = std::time::Instant::now();
-                                    let system_prompt = format!(
-                                        "你是 {}，角色：{}。请简洁专业地回答用户问题。",
-                                        agent_name,
-                                        match agent_role {
-                                            openclaw_security::AgentRole::CodeReviewer => "代码审查员",
-                                            openclaw_security::AgentRole::SecurityAuditor => "安全审计员",
-                                            openclaw_security::AgentRole::DataAnalyst => "数据分析师",
-                                            openclaw_security::AgentRole::KnowledgeOfficer => "知识库首席官",
-                                            openclaw_security::AgentRole::ReportGenerator => "报告生成器",
-                                            openclaw_security::AgentRole::CustomerSupport => "客服助手",
-                                            _ => "AI 助手",
-                                        }
-                                    );
-                                    
-                                    let req = InferenceRequest {
-                                        request_id: 0,
-                                        messages: vec![
-                                            ConversationTurn {
-                                                role: "system".to_string(),
-                                                content: system_prompt,
-                                            },
-                                            ConversationTurn {
-                                                role: "user".to_string(),
-                                                content: message_clone,
-                                            },
-                                        ],
-                                        max_tokens_override: Some(512),
-                                        temperature_override: Some(0.7),
-                                        stream: false,
-                                    };
-                                    
-                                    match engine_clone.infer(req).await {
-                                        Ok(resp) => AppMessage::ClawAgentResponse {
-                                            agent_id: agent_id_clone,
-                                            content: resp.content,
-                                            latency_ms: start.elapsed().as_millis() as u64,
-                                        },
-                                        Err(e) => AppMessage::ClawNlPlanError {
-                                            entry_id,
-                                            error: format!("AI 推理失败: {}", e),
-                                        },
-                                    }
-                                },
-                                cosmic::Action::App,
-                            );
-                        } else {
-                            // No inference engine available
-                            return self.update(AppMessage::ClawNlPlanError {
-                                entry_id,
-                                error: "AI 推理引擎未初始化".to_string(),
-                            });
+
+                        // Lazily initialise inference engine if needed
+                        if self.inference_engine.is_none() {
+                            let cfg = InferenceConfig {
+                                backend: BackendKind::Ollama,
+                                endpoint: self.ai_chat.endpoint.clone(),
+                                model_name: self.ai_chat.model_name.clone(),
+                                ..InferenceConfig::default()
+                            };
+                            match InferenceEngine::new(cfg) {
+                                Ok(eng) => {
+                                    tracing::info!("[CLAW-AGENT] inference engine initialised");
+                                    self.inference_engine = Some(Arc::new(eng));
+                                }
+                                Err(e) => {
+                                    let err = format!("AI 推理引擎初始化失败: {e}");
+                                    return self.update(AppMessage::ClawNlPlanError { entry_id, error: err });
+                                }
+                            }
                         }
+
+                        // Build multi-turn conversation: system + history + new user message
+                        let history = self.claw_agent_conversations
+                            .entry(agent_id_clone.clone())
+                            .or_insert_with(Vec::new);
+                        history.push(ConversationTurn {
+                            role: "user".to_string(),
+                            content: message_clone.clone(),
+                        });
+                        let mut messages = vec![ConversationTurn {
+                            role: "system".to_string(),
+                            content: system_prompt,
+                        }];
+                        // Keep last 20 turns (10 user + 10 assistant) to stay within context
+                        let history_snapshot: Vec<ConversationTurn> = history
+                            .iter()
+                            .rev()
+                            .take(20)
+                            .cloned()
+                            .collect::<Vec<_>>()
+                            .into_iter()
+                            .rev()
+                            .collect();
+                        messages.extend(history_snapshot);
+
+                        let engine_clone = self.inference_engine.as_ref().unwrap().clone();
+                        tracing::info!("[CLAW-AGENT] {} messages (incl system) to agent {}", messages.len(), agent_id_clone);
+                        return Task::perform(
+                            async move {
+                                let start = std::time::Instant::now();
+                                let req = InferenceRequest {
+                                    request_id: entry_id,
+                                    messages,
+                                    max_tokens_override: Some(512),
+                                    temperature_override: Some(0.7),
+                                    stream: false,
+                                };
+                                match engine_clone.infer(req).await {
+                                    Ok(resp) => AppMessage::ClawAgentResponse {
+                                        agent_id: agent_id_clone,
+                                        content: resp.content,
+                                        latency_ms: start.elapsed().as_millis() as u64,
+                                    },
+                                    Err(e) => AppMessage::ClawNlPlanError {
+                                        entry_id,
+                                        error: format!("AI 推理失败: {e}"),
+                                    },
+                                }
+                            },
+                            cosmic::Action::App,
+                        );
                     }
                 }
             }
             AppMessage::ClawAgentResponse { agent_id, content, latency_ms } => {
-                // Find the agent name
+                // Save assistant reply into per-agent conversation history for multi-turn
+                self.claw_agent_conversations
+                    .entry(agent_id.clone())
+                    .or_insert_with(Vec::new)
+                    .push(ConversationTurn {
+                        role: "assistant".to_string(),
+                        content: content.clone(),
+                    });
+
                 let agent_name = self.claw_agent_list
                     .iter()
                     .find(|a| a.id.as_str() == &agent_id)
                     .map(|a| a.display_name.clone())
                     .unwrap_or_else(|| "Agent".to_string());
-                
-                // Add agent response to history
+
                 let entry_id = self.claw_next_id;
                 self.claw_next_id += 1;
                 self.claw_history.push(ClawEntry {
