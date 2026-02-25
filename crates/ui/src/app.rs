@@ -374,7 +374,7 @@ pub enum AppMessage {
     /// Send a message to the selected agent in Claw Terminal.
     ClawAgentChat(String),
     /// Agent response received.
-    ClawAgentResponse { agent_id: String, content: String, latency_ms: u64 },
+    ClawAgentResponse { agent_id: String, content: String, latency_ms: u64, user_entry_id: u64 },
     /// AI connection test result.
     OpenClawAiTestResult { ok: bool, message: String },
     // ── Channel config messages ────────────────────────────────────────────
@@ -3576,6 +3576,7 @@ impl cosmic::Application for OpenClawApp {
                                             agent_id: agent_id_clone,
                                             content: resp.content,
                                             latency_ms: start.elapsed().as_millis() as u64,
+                                            user_entry_id: entry_id,
                                         }
                                     }
                                     Err(e) => {
@@ -3592,7 +3593,7 @@ impl cosmic::Application for OpenClawApp {
                     }
                 }
             }
-            AppMessage::ClawAgentResponse { agent_id, content, latency_ms } => {
+            AppMessage::ClawAgentResponse { agent_id, content, latency_ms, user_entry_id } => {
                 // Save assistant reply into per-agent conversation history for multi-turn
                 self.claw_agent_conversations
                     .entry(agent_id.clone())
@@ -3602,16 +3603,22 @@ impl cosmic::Application for OpenClawApp {
                         content: content.clone(),
                     });
 
+                // Update user message entry status from Running -> Success
+                if let Some(user_entry) = self.claw_history.iter_mut().find(|e| e.id == user_entry_id) {
+                    user_entry.status = ClawEntryStatus::Success;
+                    user_entry.elapsed_ms = Some(latency_ms);
+                }
+
                 let agent_name = self.claw_agent_list
                     .iter()
                     .find(|a| a.id.as_str() == &agent_id)
                     .map(|a| a.display_name.clone())
                     .unwrap_or_else(|| "Agent".to_string());
 
-                let entry_id = self.claw_next_id;
+                let new_entry_id = self.claw_next_id;
                 self.claw_next_id += 1;
                 self.claw_history.push(ClawEntry {
-                    id: entry_id,
+                    id: new_entry_id,
                     command: format!("🤖 {}", agent_name),
                     timestamp: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
