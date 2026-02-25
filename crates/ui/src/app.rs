@@ -3702,12 +3702,30 @@ impl cosmic::Application for OpenClawApp {
                             agent_name, role_desc
                         );
 
+                        // Detect image prefix for display purposes
+                        let has_image = message.starts_with("[image:");
+                        let display_message = if has_image {
+                            // Extract user text after the image prefix line
+                            let text_part = message
+                                .lines()
+                                .skip(1)
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            if text_part.trim().is_empty() {
+                                "📎 [图片已附加]".to_string()
+                            } else {
+                                format!("📎 [图片] {}", text_part)
+                            }
+                        } else {
+                            message.clone()
+                        };
+
                         // Add user message to Claw history display
                         let entry_id = self.claw_next_id;
                         self.claw_next_id += 1;
                         self.claw_history.push(ClawEntry {
                             id: entry_id,
-                            command: format!("[{}] {}", agent_name, message),
+                            command: format!("[{}] {}", agent_name, display_message),
                             timestamp: std::time::SystemTime::now()
                                 .duration_since(std::time::UNIX_EPOCH)
                                 .map(|d| d.as_secs())
