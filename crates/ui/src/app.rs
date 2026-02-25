@@ -2791,6 +2791,10 @@ impl cosmic::Application for OpenClawApp {
                 let entry_id = self.claw_next_id;
                 self.claw_next_id += 1;
                 self.claw_history.push(ClawEntry::new(entry_id, &raw));
+                let scroll_bottom2 = iced_scrollable::snap_to(
+                    CLAW_SCROLL_ID.clone(),
+                    RelativeOffset { x: 0.0, y: 1.0 },
+                );
 
                 // NL mode: route through AI intent parser first
                 if self.claw_nl_mode {
@@ -3341,8 +3345,11 @@ impl cosmic::Application for OpenClawApp {
                                 elapsed_ms,
                             })
                         },
-                    );
+                    ).chain(scroll_bottom2);
                 }
+                // Unreachable: all branches above return
+                #[allow(unreachable_code)]
+                return scroll_bottom2;
             }
             AppMessage::ClawOutputLine { entry_id, line, is_stderr } => {
                 if let Some(entry) = self.claw_history.iter_mut().find(|e| e.id == entry_id) {
