@@ -3,7 +3,9 @@ use crate::pages::ai_chat::EngineStatus;
 use crate::app::SandboxStatus;
 use crate::theme::Language;
 use cosmic::iced::{Alignment, Length};
+use cosmic::iced::keyboard;
 use cosmic::widget;
+use cosmic::widget::text_editor::{Binding, KeyPress};
 use cosmic::Element;
 
 /// Stable ID for the Claw Terminal input box.
@@ -20,7 +22,7 @@ impl ClawTerminalPage {
     pub fn view<'a>(
         lang: Language,
         history: &'a [ClawEntry],
-        input: &'a str,
+        editor: &'a cosmic::widget::text_editor::Content,
         sandbox_status: &'a SandboxStatus,
         ai_status: &'a EngineStatus,
         nl_mode: bool,
@@ -345,8 +347,8 @@ impl ClawTerminalPage {
                 "❯",
                 color_accent,
                 crate::theme::t(lang,
-                    "Type a command… (Enter to run, Cmd+Enter to send to Agent, 'help' for list)",
-                    "输入命令… (Enter 执行，Cmd+Enter 发给 Agent，'help' 查看列表)",
+                    "Type a command… (Enter = newline, Cmd+Enter = send/run, 'help' for list)",
+                    "输入命令… (Enter 换行，Cmd+Enter 发送/执行，'help' 查看列表)",
                 ),
             )
         };
@@ -405,15 +407,28 @@ impl ClawTerminalPage {
                     .into(),
                 widget::Space::new(8, 0).into(),
                 widget::container(
-                    widget::text_input(placeholder, input)
-                        .id(CLAW_INPUT_ID.clone())
-                        .on_input(|s| AppMessage::ClawInputChanged(s))
-                        .on_submit(|_| AppMessage::ClawSendCommand)
+                    widget::text_editor(editor)
+                        .placeholder(placeholder)
+                        .on_action(AppMessage::ClawEditorAction)
+                        .height(Length::Shrink)
+                        .padding([4, 6])
                         .font(cosmic::font::mono())
                         .size(13)
-                        .width(Length::Fill)
+                        .key_binding(move |kp: KeyPress| {
+                            use keyboard::key::Named;
+                            match kp.key.as_ref() {
+                                // Cmd+Enter → send/run
+                                keyboard::Key::Named(Named::Enter) if kp.modifiers.command() => {
+                                    Some(Binding::Custom(AppMessage::ClawSendCommand))
+                                }
+                                // Enter → newline
+                                keyboard::Key::Named(Named::Enter) => Some(Binding::Enter),
+                                _ => Binding::from_key_press(kp),
+                            }
+                        })
                 )
-                .style(|_: &cosmic::Theme| {
+                .style(move |theme: &cosmic::Theme| {
+                    // 检测是否为焦点状态（这里简化为默认浅灰，实际焦点检测需要额外状态）
                     cosmic::iced::widget::container::Style {
                         border: cosmic::iced::Border {
                             color: cosmic::iced::Color::from_rgba(0.6, 0.6, 0.6, 0.35),

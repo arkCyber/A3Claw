@@ -1497,7 +1497,7 @@ impl cosmic::Application for OpenClawApp {
             NavPage::ClawTerminal => ClawTerminalPage::view(
                 lang,
                 &self.claw_history,
-                &self.claw_input,
+                &self.claw_editor,
                 &self.sandbox_status,
                 &self.ai_chat.status,
                 self.claw_nl_mode,
@@ -2947,16 +2947,16 @@ impl cosmic::Application for OpenClawApp {
             }
             AppMessage::ClawVoiceTranscribed(text) => {
                 self.claw_voice_status = None;
-                // Append transcribed text to current input
-                if self.claw_input.is_empty() {
-                    self.claw_input = text;
+                // Append transcribed text into both claw_input and claw_editor
+                let current = self.claw_editor.text();
+                let current = current.trim_end_matches('\n');
+                let new_content = if current.is_empty() {
+                    text.clone()
                 } else {
-                    self.claw_input.push(' ');
-                    self.claw_input.push_str(&text);
-                }
-                return cosmic::widget::text_input::focus(
-                    crate::pages::claw_terminal::CLAW_INPUT_ID.clone(),
-                ).map(cosmic::Action::App);
+                    format!("{} {}", current, text)
+                };
+                self.claw_input = new_content.clone();
+                self.claw_editor = cosmic::widget::text_editor::Content::with_text(&new_content);
             }
             AppMessage::ClawVoiceError(err) => {
                 self.claw_recording = false;
@@ -2967,16 +2967,25 @@ impl cosmic::Application for OpenClawApp {
                 self.claw_history.clear();
             }
             AppMessage::ClawQuickAction(action) => {
-                self.claw_input = action.command().to_string();
+                let cmd = action.command().to_string();
+                self.claw_input = cmd.clone();
+                self.claw_editor = cosmic::widget::text_editor::Content::with_text(&cmd);
                 return self.update(AppMessage::ClawSendCommand);
             }
             AppMessage::ClawSendCommand => {
-                let raw = self.claw_input.trim().to_string();
+                // Prefer editor content; fall back to legacy claw_input
+                let editor_text = self.claw_editor.text();
+                let raw = if !editor_text.trim().is_empty() {
+                    editor_text.trim_end_matches('\n').trim().to_string()
+                } else {
+                    self.claw_input.trim().to_string()
+                };
                 // Allow send when attachment present even if text is empty
                 if raw.is_empty() && self.claw_attachment.is_none() {
                     return Task::none();
                 }
                 self.claw_input.clear();
+                self.claw_editor = cosmic::widget::text_editor::Content::new();
 
                 tracing::info!("[CLAW] Send command: {}", raw);
                 tracing::info!("[CLAW] Selected agent: {:?}", self.claw_selected_agent_id);
@@ -4374,12 +4383,12 @@ impl cosmic::Application for OpenClawApp {
         // Keyboard shortcuts:
         // - ArrowUp / ArrowDown: sidebar navigation
         // - Cmd+Enter (macOS) / Ctrl+Enter (others): send Claw Terminal message
-        let keyboard_sub = keyboard::on_key_press(|key, modifiers| {
-            let cmd = modifiers.command();
+        let keyboard_sub = keyboard::on_key_press(|key, _modifiers| {
             match key {
+                // Arrow keys navigate the sidebar
                 Key::Named(keyboard::key::Named::ArrowUp)   => Some(AppMessage::NavUp),
                 Key::Named(keyboard::key::Named::ArrowDown) => Some(AppMessage::NavDown),
-                Key::Named(keyboard::key::Named::Enter) if cmd => Some(AppMessage::ClawSendCommand),
+                // Cmd+Enter is handled inside text_editor key_binding — do NOT intercept here
                 _ => None,
             }
         });
