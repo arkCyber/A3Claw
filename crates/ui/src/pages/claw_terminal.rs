@@ -437,80 +437,49 @@ fn build_entry_card<'a>(
     }
 }
 
-/// Telegram message card — blue left border, sender name, timestamp.
+/// Telegram message card.
 fn build_telegram_card<'a>(
     entry: &'a ClawEntry,
     from: &'a str,
     color_muted: cosmic::iced::Color,
 ) -> Element<'a, AppMessage> {
     let color_tg = cosmic::iced::Color::from_rgb(0.28, 0.78, 0.96);
-    let color_tg_bg = cosmic::iced::Color::from_rgba(0.28, 0.78, 0.96, 0.08);
+    let color_text = cosmic::iced::Color::from_rgb(0.92, 0.92, 0.92);
 
-    let header = widget::row::with_children(vec![
-        widget::container(widget::Space::new(3, 0))
-            .style(move |_: &cosmic::Theme| cosmic::iced::widget::container::Style {
-                background: Some(cosmic::iced::Background::Color(color_tg)),
-                border: cosmic::iced::Border { radius: 2.0.into(), ..Default::default() },
-                ..Default::default()
-            })
-            .height(Length::Fill)
-            .into(),
-        widget::Space::new(10, 0).into(),
-        widget::column::with_children(vec![
-            widget::row::with_children(vec![
-                widget::text("✈").size(12)
-                    .class(cosmic::theme::Text::Color(color_tg)).into(),
-                widget::Space::new(6, 0).into(),
-                widget::text(format!("@{}", from)).size(12).font(cosmic::font::bold())
-                    .class(cosmic::theme::Text::Color(color_tg)).into(),
-                widget::Space::new(Length::Fill, 0).into(),
-                widget::text("Telegram").size(10)
-                    .class(cosmic::theme::Text::Color(color_muted)).into(),
-            ]).spacing(0).align_y(Alignment::Center).into(),
-            widget::Space::new(0, 4).into(),
-            widget::text(&entry.command).size(13)
-                .class(cosmic::theme::Text::Color(
-                    cosmic::iced::Color::from_rgb(0.92, 0.92, 0.92)
-                ))
-                .width(Length::Fill)
-                .into(),
-        ]).spacing(0).width(Length::Fill).into(),
-    ])
-    .spacing(0)
-    .align_y(Alignment::Start);
+    let mut children: Vec<Element<AppMessage>> = vec![
+        // Header: badge + sender + platform label
+        widget::row::with_children(vec![
+            widget::text("✈ ").size(12).class(cosmic::theme::Text::Color(color_tg)).into(),
+            widget::text(format!("@{}", from)).size(12).font(cosmic::font::bold())
+                .class(cosmic::theme::Text::Color(color_tg)).into(),
+            widget::Space::new(Length::Fill, 0).into(),
+            widget::text("Telegram").size(10).class(cosmic::theme::Text::Color(color_muted)).into(),
+        ]).spacing(4).align_y(Alignment::Center).into(),
+        // Message text
+        widget::Space::new(0, 4).into(),
+        widget::text(&entry.command).size(13)
+            .class(cosmic::theme::Text::Color(color_text))
+            .width(Length::Fill).into(),
+    ];
 
-    // Metadata lines (from, chat_id, timestamp)
-    let meta_widgets: Vec<Element<AppMessage>> = entry.output_lines.iter().map(|(line, _)| {
-        widget::text(line.as_str()).size(10)
-            .class(cosmic::theme::Text::Color(color_muted))
-            .into()
-    }).collect();
-
-    let mut children: Vec<Element<AppMessage>> = vec![header.into()];
-    if !meta_widgets.is_empty() {
-        children.push(widget::Space::new(0, 4).into());
+    // Metadata / output lines
+    for (line, _) in &entry.output_lines {
         children.push(
-            widget::column::with_children(meta_widgets).spacing(2).padding([0, 13]).into()
+            widget::text(line.as_str()).size(10)
+                .class(cosmic::theme::Text::Color(color_muted))
+                .width(Length::Fill).into()
         );
     }
 
     widget::container(
         widget::column::with_children(children).spacing(0).padding([8, 12]),
     )
-    .style(move |_: &cosmic::Theme| cosmic::iced::widget::container::Style {
-        background: Some(cosmic::iced::Background::Color(color_tg_bg)),
-        border: cosmic::iced::Border {
-            color: color_tg,
-            width: 1.0,
-            radius: 6.0.into(),
-        },
-        ..Default::default()
-    })
+    .class(cosmic::theme::Container::Card)
     .width(Length::Fill)
     .into()
 }
 
-/// OpenClaw reply card — green left border, OpenClaw badge.
+/// OpenClaw / Agent reply card.
 fn build_openclaw_card<'a>(
     entry: &'a ClawEntry,
     _color_accent: cosmic::iced::Color,
@@ -518,167 +487,127 @@ fn build_openclaw_card<'a>(
     color_error: cosmic::iced::Color,
     _color_muted: cosmic::iced::Color,
 ) -> Element<'a, AppMessage> {
-    let color_oc = cosmic::iced::Color::from_rgb(0.28, 0.92, 0.78);
-    let color_oc_bg = cosmic::iced::Color::from_rgba(0.28, 0.92, 0.78, 0.06);
+    let color_oc    = cosmic::iced::Color::from_rgb(0.28, 0.92, 0.78);
+    let color_reply = cosmic::iced::Color::from_rgb(0.88, 0.98, 0.92);
+    let color_time  = cosmic::iced::Color::from_rgb(0.45, 0.72, 0.58);
 
-    let header = widget::row::with_children(vec![
-        widget::container(widget::Space::new(3, 0))
-            .style(move |_: &cosmic::Theme| cosmic::iced::widget::container::Style {
-                background: Some(cosmic::iced::Background::Color(color_oc)),
-                border: cosmic::iced::Border { radius: 2.0.into(), ..Default::default() },
-                ..Default::default()
-            })
-            .height(Length::Fill)
-            .into(),
-        widget::Space::new(10, 0).into(),
-        widget::column::with_children(vec![
-            widget::row::with_children(vec![
-                widget::text("🤖").size(12).into(),
-                widget::Space::new(6, 0).into(),
-                widget::text("OpenClaw").size(12).font(cosmic::font::bold())
-                    .class(cosmic::theme::Text::Color(color_oc)).into(),
-                widget::Space::new(Length::Fill, 0).into(),
-            ]).spacing(0).align_y(Alignment::Center).into(),
-            widget::Space::new(0, 4).into(),
-            widget::text(&entry.command).size(13)
-                .class(cosmic::theme::Text::Color(cosmic::iced::Color::from_rgb(0.92, 0.92, 0.92)))
-                .width(Length::Fill).into(),
-        ]).spacing(0).width(Length::Fill).into(),
-    ])
-    .spacing(0)
-    .align_y(Alignment::Start);
+    // Header: badge + agent name
+    let mut children: Vec<Element<AppMessage>> = vec![
+        widget::row::with_children(vec![
+            widget::text("🤖 ").size(13).into(),
+            widget::text(&entry.command).size(13).font(cosmic::font::bold())
+                .class(cosmic::theme::Text::Color(color_oc))
+                .width(Length::Fill)
+                .into(),
+        ])
+        .spacing(0)
+        .align_y(Alignment::Center)
+        .into(),
+        widget::Space::new(0, 6).into(),
+    ];
 
-    let output_widgets: Vec<Element<AppMessage>> = entry.output_lines.iter().map(|(line, is_err)| {
-        let c = if *is_err { color_error } else { cosmic::iced::Color::from_rgb(0.82, 0.82, 0.82) };
-        widget::text(line.as_str()).size(12).font(cosmic::font::mono())
-            .class(cosmic::theme::Text::Color(c)).width(Length::Fill).into()
-    }).collect();
+    // Reply content lines
+    if !entry.output_lines.is_empty() {
+        for (line, is_err) in &entry.output_lines {
+            let c = if *is_err { color_error } else { color_reply };
+            children.push(
+                widget::text(line.as_str())
+                    .size(13)
+                    .class(cosmic::theme::Text::Color(c))
+                    .width(Length::Fill)
+                    .into()
+            );
+        }
+    } else {
+        children.push(
+            widget::text("(no output)").size(12)
+                .class(cosmic::theme::Text::Color(
+                    cosmic::iced::Color::from_rgb(0.55, 0.55, 0.55)
+                ))
+                .into()
+        );
+    }
 
-    let mut children: Vec<Element<AppMessage>> = vec![header.into()];
-    if !output_widgets.is_empty() {
+    // Latency badge
+    if let Some(ms) = entry.elapsed_ms {
+        let t = if ms < 1000 { format!("{ms}ms") } else { format!("{:.1}s", ms as f64 / 1000.0) };
         children.push(widget::Space::new(0, 4).into());
         children.push(
-            widget::container(
-                widget::column::with_children(output_widgets).spacing(2).padding([6, 13]),
-            )
-            .style(|_: &cosmic::Theme| cosmic::iced::widget::container::Style {
-                background: Some(cosmic::iced::Background::Color(
-                    cosmic::iced::Color::from_rgba(0.0, 0.0, 0.0, 0.2),
-                )),
-                border: cosmic::iced::Border { radius: 4.0.into(), ..Default::default() },
-                ..Default::default()
-            })
-            .width(Length::Fill).into(),
+            widget::text(format!("⏱ {t}")).size(10)
+                .class(cosmic::theme::Text::Color(color_time))
+                .into()
         );
     }
 
     widget::container(
-        widget::column::with_children(children).spacing(0).padding([8, 12]),
+        widget::column::with_children(children).spacing(0).padding([10, 12]),
     )
-    .style(move |_: &cosmic::Theme| cosmic::iced::widget::container::Style {
-        background: Some(cosmic::iced::Background::Color(color_oc_bg)),
-        border: cosmic::iced::Border {
-            color: color_oc,
-            width: 1.0,
-            radius: 6.0.into(),
-        },
-        ..Default::default()
-    })
+    .class(cosmic::theme::Container::Card)
     .width(Length::Fill)
     .into()
 }
 
-/// Discord / Matrix / Slack message card — platform-colored border.
+/// Discord / Matrix / Slack message card.
 fn build_bot_channel_card<'a>(
     entry: &'a ClawEntry,
     platform: &'a str,
     from: &'a str,
     color_muted: cosmic::iced::Color,
 ) -> Element<'a, AppMessage> {
-    let (color_border, icon) = match platform {
-        "Discord" => (cosmic::iced::Color::from_rgb(0.44, 0.50, 0.90), "🎮"),
-        "Matrix"  => (cosmic::iced::Color::from_rgb(0.20, 0.72, 0.56), "🔷"),
-        "Slack"   => (cosmic::iced::Color::from_rgb(0.90, 0.32, 0.48), "💬"),
-        _         => (cosmic::iced::Color::from_rgb(0.60, 0.60, 0.60), "📡"),
+    let (color_label, icon) = match platform {
+        "Discord" => (cosmic::iced::Color::from_rgb(0.55, 0.62, 0.98), "🎮"),
+        "Matrix"  => (cosmic::iced::Color::from_rgb(0.20, 0.82, 0.62), "🔷"),
+        "Slack"   => (cosmic::iced::Color::from_rgb(0.98, 0.42, 0.58), "💬"),
+        _         => (cosmic::iced::Color::from_rgb(0.70, 0.70, 0.70), "📡"),
     };
-    let color_bg = cosmic::iced::Color::from_rgba(
-        color_border.r, color_border.g, color_border.b, 0.07
-    );
+    let color_text = cosmic::iced::Color::from_rgb(0.92, 0.92, 0.92);
 
-    let header = widget::row::with_children(vec![
-        widget::container(widget::Space::new(3, 0))
-            .style(move |_: &cosmic::Theme| cosmic::iced::widget::container::Style {
-                background: Some(cosmic::iced::Background::Color(color_border)),
-                border: cosmic::iced::Border { radius: 2.0.into(), ..Default::default() },
-                ..Default::default()
-            })
-            .height(Length::Fill)
-            .into(),
-        widget::Space::new(10, 0).into(),
-        widget::column::with_children(vec![
-            widget::row::with_children(vec![
-                widget::text(icon).size(12).into(),
-                widget::Space::new(6, 0).into(),
-                widget::text(from).size(12).font(cosmic::font::bold())
-                    .class(cosmic::theme::Text::Color(color_border)).into(),
-                widget::Space::new(Length::Fill, 0).into(),
-                widget::text(platform).size(10)
-                    .class(cosmic::theme::Text::Color(color_muted)).into(),
-            ]).spacing(0).align_y(Alignment::Center).into(),
-            widget::Space::new(0, 4).into(),
-            widget::text(&entry.command).size(13)
-                .class(cosmic::theme::Text::Color(
-                    cosmic::iced::Color::from_rgb(0.92, 0.92, 0.92)
-                ))
-                .width(Length::Fill)
-                .into(),
-        ]).spacing(0).width(Length::Fill).into(),
-    ])
-    .spacing(0)
-    .align_y(Alignment::Start);
+    let mut children: Vec<Element<AppMessage>> = vec![
+        // Header: icon + sender + platform
+        widget::row::with_children(vec![
+            widget::text(format!("{} ", icon)).size(12)
+                .class(cosmic::theme::Text::Color(color_label)).into(),
+            widget::text(from).size(12).font(cosmic::font::bold())
+                .class(cosmic::theme::Text::Color(color_label)).into(),
+            widget::Space::new(Length::Fill, 0).into(),
+            widget::text(platform).size(10)
+                .class(cosmic::theme::Text::Color(color_muted)).into(),
+        ]).spacing(4).align_y(Alignment::Center).into(),
+        // Message text
+        widget::Space::new(0, 4).into(),
+        widget::text(&entry.command).size(13)
+            .class(cosmic::theme::Text::Color(color_text))
+            .width(Length::Fill).into(),
+    ];
 
-    let meta_widgets: Vec<Element<AppMessage>> = entry.output_lines.iter().map(|(line, _)| {
-        widget::text(line.as_str()).size(10)
-            .class(cosmic::theme::Text::Color(color_muted))
-            .into()
-    }).collect();
-
-    let mut children: Vec<Element<AppMessage>> = vec![header.into()];
-    if !meta_widgets.is_empty() {
-        children.push(widget::Space::new(0, 4).into());
+    // Metadata / output lines
+    for (line, _) in &entry.output_lines {
         children.push(
-            widget::column::with_children(meta_widgets).spacing(2).padding([0, 13]).into()
+            widget::text(line.as_str()).size(10)
+                .class(cosmic::theme::Text::Color(color_muted))
+                .width(Length::Fill).into()
         );
     }
 
     widget::container(
         widget::column::with_children(children).spacing(0).padding([8, 12]),
     )
-    .style(move |_: &cosmic::Theme| cosmic::iced::widget::container::Style {
-        background: Some(cosmic::iced::Background::Color(color_bg)),
-        border: cosmic::iced::Border {
-            color: color_border,
-            width: 1.0,
-            radius: 6.0.into(),
-        },
-        ..Default::default()
-    })
+    .class(cosmic::theme::Container::Card)
     .width(Length::Fill)
     .into()
 }
 
-/// System info card — subtle muted style, no border accent.
+/// System info card.
 fn build_system_card<'a>(
     entry: &'a ClawEntry,
     color_muted: cosmic::iced::Color,
 ) -> Element<'a, AppMessage> {
-    let color_sys = cosmic::iced::Color::from_rgb(0.72, 0.68, 0.62);
+    let color_sys = cosmic::iced::Color::from_rgb(0.75, 0.72, 0.65);
+    let color_err = cosmic::iced::Color::from_rgb(0.92, 0.30, 0.30);
 
     let mut children: Vec<Element<AppMessage>> = vec![
         widget::row::with_children(vec![
-            widget::text("ℹ").size(11)
-                .class(cosmic::theme::Text::Color(color_sys)).into(),
-            widget::Space::new(8, 0).into(),
+            widget::text("ℹ ").size(11).class(cosmic::theme::Text::Color(color_sys)).into(),
             widget::text(&entry.command).size(12)
                 .class(cosmic::theme::Text::Color(color_sys))
                 .width(Length::Fill).into(),
@@ -686,30 +615,18 @@ fn build_system_card<'a>(
     ];
 
     for (line, is_err) in &entry.output_lines {
-        let c = if *is_err {
-            cosmic::iced::Color::from_rgb(0.92, 0.28, 0.28)
-        } else {
-            color_muted
-        };
+        let c = if *is_err { color_err } else { color_muted };
         children.push(
-            widget::row::with_children(vec![
-                widget::Space::new(20, 0).into(),
-                widget::text(line.as_str()).size(11)
-                    .class(cosmic::theme::Text::Color(c)).width(Length::Fill).into(),
-            ]).into()
+            widget::text(line.as_str()).size(11)
+                .class(cosmic::theme::Text::Color(c))
+                .width(Length::Fill).into()
         );
     }
 
     widget::container(
         widget::column::with_children(children).spacing(3).padding([6, 12]),
     )
-    .style(|_: &cosmic::Theme| cosmic::iced::widget::container::Style {
-        background: Some(cosmic::iced::Background::Color(
-            cosmic::iced::Color::from_rgba(0.5, 0.5, 0.5, 0.06),
-        )),
-        border: cosmic::iced::Border { radius: 4.0.into(), ..Default::default() },
-        ..Default::default()
-    })
+    .class(cosmic::theme::Container::Card)
     .width(Length::Fill)
     .into()
 }
@@ -779,20 +696,7 @@ fn build_user_card<'a>(
     let mut card_children: Vec<Element<AppMessage>> = vec![cmd_header.into()];
     if !output_widgets.is_empty() {
         card_children.push(widget::Space::new(0, 4).into());
-        card_children.push(
-            widget::container(
-                widget::column::with_children(output_widgets).spacing(2).padding([6, 8]),
-            )
-            .style(|_: &cosmic::Theme| cosmic::iced::widget::container::Style {
-                background: Some(cosmic::iced::Background::Color(
-                    cosmic::iced::Color::from_rgba(0.0, 0.0, 0.0, 0.25),
-                )),
-                border: cosmic::iced::Border { radius: 4.0.into(), ..Default::default() },
-                ..Default::default()
-            })
-            .width(Length::Fill)
-            .into(),
-        );
+        card_children.extend(output_widgets);
     }
 
     widget::container(
