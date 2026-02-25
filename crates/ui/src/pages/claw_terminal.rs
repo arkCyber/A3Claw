@@ -10,6 +10,10 @@ use cosmic::Element;
 pub static CLAW_INPUT_ID: std::sync::LazyLock<cosmic::widget::Id> =
     std::sync::LazyLock::new(cosmic::widget::Id::unique);
 
+/// Stable ID for the Claw Terminal history scrollable.
+pub static CLAW_SCROLL_ID: std::sync::LazyLock<cosmic::widget::Id> =
+    std::sync::LazyLock::new(cosmic::widget::Id::unique);
+
 pub struct ClawTerminalPage;
 
 impl ClawTerminalPage {
@@ -394,7 +398,8 @@ impl ClawTerminalPage {
             widget::column::with_children(page_children)
                 .spacing(8)
                 .padding([24, 24, 8, 24]),
-        );
+        )
+        .id(CLAW_SCROLL_ID.clone());
 
         widget::column::with_children(vec![
             scrollable_content.height(Length::Fill).into(),

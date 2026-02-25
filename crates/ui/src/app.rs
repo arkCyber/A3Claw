@@ -2,6 +2,7 @@ use cosmic::app::{Core, Task};
 use cosmic::iced::{Alignment, Length, Subscription};
 use cosmic::iced::keyboard::{self, Key};
 use cosmic::iced::widget::container::Style as ContainerStyle;
+use cosmic::iced::widget::scrollable::{self as iced_scrollable, RelativeOffset};
 use cosmic::{executor, Element};
 use cosmic::widget::{self, menu, nav_bar};
 use flume::{Receiver, Sender};
@@ -28,7 +29,7 @@ use crate::pages::{
     events::EventsPage,
     settings::SettingsPage,
     general_settings::GeneralSettingsPage,
-    claw_terminal::ClawTerminalPage,
+    claw_terminal::{ClawTerminalPage, CLAW_SCROLL_ID},
 };
 use crate::theme::{Language, t, tx};
 
@@ -2776,9 +2777,14 @@ impl cosmic::Application for OpenClawApp {
                 tracing::info!("[CLAW] Selected agent: {:?}", self.claw_selected_agent_id);
 
                 // Agent chat mode: send message to selected agent
+                let scroll_bottom = iced_scrollable::snap_to(
+                    CLAW_SCROLL_ID.clone(),
+                    RelativeOffset { x: 0.0, y: 1.0 },
+                );
                 if let Some(agent_id) = &self.claw_selected_agent_id {
                     tracing::info!("[CLAW] Routing to agent chat: {}", agent_id);
-                    return self.update(AppMessage::ClawAgentChat(raw));
+                    let task = self.update(AppMessage::ClawAgentChat(raw));
+                    return Task::chain(task, scroll_bottom);
                 }
 
                 tracing::info!("[CLAW] Routing to shell command execution");
@@ -3608,6 +3614,7 @@ impl cosmic::Application for OpenClawApp {
                     user_entry.status = ClawEntryStatus::Success;
                     user_entry.elapsed_ms = Some(latency_ms);
                 }
+                // Will snap_to bottom after pushing the reply entry (handled below)
 
                 let agent_name = self.claw_agent_list
                     .iter()
@@ -3641,6 +3648,10 @@ impl cosmic::Application for OpenClawApp {
                     output_lines,
                     elapsed_ms: Some(latency_ms),
                 });
+                return iced_scrollable::snap_to(
+                    CLAW_SCROLL_ID.clone(),
+                    RelativeOffset { x: 0.0, y: 1.0 },
+                );
             }
             AppMessage::ClawNlPlanError { entry_id, error } => {
                 if let Some(entry) = self.claw_history.iter_mut().find(|e| e.id == entry_id) {
