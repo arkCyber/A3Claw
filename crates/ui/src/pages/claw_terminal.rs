@@ -318,7 +318,7 @@ impl ClawTerminalPage {
                 .into(),
             ]
         } else {
-            history.iter().rev().map(|entry| {
+            history.iter().map(|entry| {
                 build_entry_card(entry, color_accent, color_success, color_error, color_stderr, color_running, color_muted)
             }).collect()
         };

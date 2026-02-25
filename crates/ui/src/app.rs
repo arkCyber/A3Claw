@@ -3615,6 +3615,18 @@ impl cosmic::Application for OpenClawApp {
                     .map(|a| a.display_name.clone())
                     .unwrap_or_else(|| "Agent".to_string());
 
+                // Split content by newlines so each line renders correctly
+                let output_lines: Vec<(String, bool)> = content
+                    .split('\n')
+                    .map(|l| (l.to_string(), false))
+                    .filter(|(l, _)| !l.trim().is_empty())
+                    .collect();
+                let output_lines = if output_lines.is_empty() {
+                    vec![(content.clone(), false)]
+                } else {
+                    output_lines
+                };
+
                 let new_entry_id = self.claw_next_id;
                 self.claw_next_id += 1;
                 self.claw_history.push(ClawEntry {
@@ -3626,7 +3638,7 @@ impl cosmic::Application for OpenClawApp {
                         .unwrap_or(0),
                     source: ClawEntrySource::OpenClaw,
                     status: ClawEntryStatus::Success,
-                    output_lines: vec![(content, false)],
+                    output_lines,
                     elapsed_ms: Some(latency_ms),
                 });
             }
@@ -4094,11 +4106,17 @@ impl cosmic::Application for OpenClawApp {
             );
         }
 
-        // Keyboard navigation: ArrowUp / ArrowDown move through sidebar pages.
-        let keyboard_sub = keyboard::on_key_press(|key, _modifiers| match key {
-            Key::Named(keyboard::key::Named::ArrowUp)   => Some(AppMessage::NavUp),
-            Key::Named(keyboard::key::Named::ArrowDown) => Some(AppMessage::NavDown),
-            _ => None,
+        // Keyboard shortcuts:
+        // - ArrowUp / ArrowDown: sidebar navigation
+        // - Cmd+Enter (macOS) / Ctrl+Enter (others): send Claw Terminal message
+        let keyboard_sub = keyboard::on_key_press(|key, modifiers| {
+            let cmd = modifiers.command();
+            match key {
+                Key::Named(keyboard::key::Named::ArrowUp)   => Some(AppMessage::NavUp),
+                Key::Named(keyboard::key::Named::ArrowDown) => Some(AppMessage::NavDown),
+                Key::Named(keyboard::key::Named::Enter) if cmd => Some(AppMessage::ClawSendCommand),
+                _ => None,
+            }
         });
 
         // Embedded mode: receive events directly from the flume channel.
