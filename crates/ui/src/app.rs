@@ -406,8 +406,10 @@ pub enum AppMessage {
     /// Channel test result.
     ChannelTestResult { idx: usize, ok: bool, message: String },
     // ── Claw Terminal messages ─────────────────────────────────────────────
-    /// User typed in the Claw Terminal input box.
+    /// User typed in the Claw Terminal input box (legacy single-line).
     ClawInputChanged(String),
+    /// User performed an edit action in the multi-line Claw Terminal editor.
+    ClawEditorAction(cosmic::widget::text_editor::Action),
     /// User submitted a command (Enter or Send button).
     ClawSendCommand,
     /// User clicked the image attachment button — open native file picker.
@@ -903,8 +905,10 @@ pub struct OpenClawApp {
     rag_folder_name_input: String,
     /// Claw Terminal: command history entries.
     claw_history: Vec<ClawEntry>,
-    /// Claw Terminal: current input buffer.
+    /// Claw Terminal: current input buffer (legacy single-line).
     claw_input: String,
+    /// Claw Terminal: multi-line editor content.
+    claw_editor: cosmic::widget::text_editor::Content,
     /// Claw Terminal: monotonic ID counter for entries.
     claw_next_id: u64,
     /// Claw Terminal: whether NL (natural language) mode is active.
@@ -1174,6 +1178,7 @@ impl cosmic::Application for OpenClawApp {
             rag_folder_name_input: String::new(),
             claw_history: Vec::new(),
             claw_input: String::new(),
+            claw_editor: cosmic::widget::text_editor::Content::new(),
             claw_next_id: 1,
             claw_nl_mode: false,
             claw_attachment: None,
@@ -2795,6 +2800,12 @@ impl cosmic::Application for OpenClawApp {
                 tracing::info!("[IME] ClawInputChanged: {:?} ({} chars)", s, s.chars().count());
                 self.claw_input = s;
             }
+            AppMessage::ClawEditorAction(action) => {
+                self.claw_editor.perform(action);
+                // Keep claw_input in sync for legacy send path
+                let raw = self.claw_editor.text();
+                self.claw_input = raw.trim_end_matches('\n').to_string();
+            }
             AppMessage::ClawInputFocused => {}
 
             // ── Image attachment ───────────────────────────────────────────
@@ -2961,7 +2972,8 @@ impl cosmic::Application for OpenClawApp {
             }
             AppMessage::ClawSendCommand => {
                 let raw = self.claw_input.trim().to_string();
-                if raw.is_empty() {
+                // Allow send when attachment present even if text is empty
+                if raw.is_empty() && self.claw_attachment.is_none() {
                     return Task::none();
                 }
                 self.claw_input.clear();
@@ -3761,26 +3773,44 @@ impl cosmic::Application for OpenClawApp {
                         }
 
                         // Build multi-turn conversation: system + history + new user message
+                        // Strip image base64 from stored content to avoid context window overflow
+                        let stored_content = if message_clone.starts_with("[image:") {
+                            let text_part = message_clone.lines().skip(1).collect::<Vec<_>>().join("\n");
+                            if text_part.trim().is_empty() {
+                                "[图片已附加]".to_string()
+                            } else {
+                                format!("[图片] {}", text_part.trim())
+                            }
+                        } else {
+                            message_clone.clone()
+                        };
                         let history = self.claw_agent_conversations
                             .entry(agent_id_clone.clone())
                             .or_insert_with(Vec::new);
                         history.push(ConversationTurn {
                             role: "user".to_string(),
-                            content: message_clone.clone(),
+                            content: stored_content,
                         });
                         let mut messages = vec![ConversationTurn {
                             role: "system".to_string(),
                             content: system_prompt,
                         }];
-                        // Keep last 20 turns (10 user + 10 assistant) to stay within context
+                        // Keep last 6 turns only; also truncate each content to 800 chars
                         let history_snapshot: Vec<ConversationTurn> = history
                             .iter()
                             .rev()
-                            .take(20)
+                            .take(6)
                             .cloned()
                             .collect::<Vec<_>>()
                             .into_iter()
                             .rev()
+                            .map(|mut t| {
+                                if t.content.len() > 800 {
+                                    t.content.truncate(800);
+                                    t.content.push_str("…");
+                                }
+                                t
+                            })
                             .collect();
                         messages.extend(history_snapshot);
 

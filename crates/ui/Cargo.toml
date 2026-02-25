@@ -26,6 +26,7 @@ openclaw-sandbox = { path = "../sandbox", default-features = false }
 openclaw-inference = { path = "../inference" }
 openclaw-store = { path = "../store" }
 openclaw-storage = { path = "../storage" }
+openclaw-voice = { path = "../voice" }
 
 # HTTP client for plugin-mode gateway calls
 reqwest = { version = "0.12", features = [
@@ -38,6 +39,9 @@ rfd = { version = "0.14", default-features = false, features = ["tokio"] }
 
 # Base64 encoding for image attachments
 base64 = "0.22"
+
+# Block-on for lazy sync init of voice engine
+futures-executor = "0.3"
 
 [dev-dependencies]
 tempfile = "3.8"

@@ -404,12 +404,27 @@ impl ClawTerminalPage {
                     .class(cosmic::theme::Text::Color(prompt_color))
                     .into(),
                 widget::Space::new(8, 0).into(),
-                widget::text_input(placeholder, input)
-                    .id(CLAW_INPUT_ID.clone())
-                    .on_input(|s| AppMessage::ClawInputChanged(s))
-                    .on_submit(|_| AppMessage::ClawSendCommand)
-                    .width(Length::Fill)
-                    .into(),
+                widget::container(
+                    widget::text_input(placeholder, input)
+                        .id(CLAW_INPUT_ID.clone())
+                        .on_input(|s| AppMessage::ClawInputChanged(s))
+                        .on_submit(|_| AppMessage::ClawSendCommand)
+                        .font(cosmic::font::mono())
+                        .size(13)
+                        .width(Length::Fill)
+                )
+                .style(|_: &cosmic::Theme| {
+                    cosmic::iced::widget::container::Style {
+                        border: cosmic::iced::Border {
+                            color: cosmic::iced::Color::from_rgba(0.6, 0.6, 0.6, 0.35),
+                            width: 1.0,
+                            radius: 4.0.into(),
+                        },
+                        ..Default::default()
+                    }
+                })
+                .width(Length::Fill)
+                .into(),
                 widget::Space::new(8, 0).into(),
                 // Voice button
                 widget::button::text(if recording { "⏹" } else { "🎙" })
@@ -453,7 +468,16 @@ impl ClawTerminalPage {
         let input_bar = widget::container(
             widget::column::with_children(input_col_children).spacing(0),
         )
-        .class(cosmic::theme::Container::Card)
+        .style(move |theme: &cosmic::Theme| {
+            let bc: cosmic::iced::Color = theme.cosmic().accent_color().into();
+            cosmic::iced::widget::container::Style {
+                background: Some(cosmic::iced::Background::Color(
+                    theme.cosmic().background.base.into()
+                )),
+                border: cosmic::iced::Border { color: bc, width: 1.0, radius: 6.0.into() },
+                ..Default::default()
+            }
+        })
         .width(Length::Fill);
 
         // ── Page layout ───────────────────────────────────────────────────────

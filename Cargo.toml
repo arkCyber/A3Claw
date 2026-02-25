@@ -7,6 +7,7 @@ members = [
     "crates/plugin",
     "crates/store",
     "crates/inference",
+    "crates/voice",
 ]
 resolver = "2"
 
