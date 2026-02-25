@@ -476,12 +476,15 @@ impl ClawTerminalPage {
             widget::column::with_children(input_col_children).spacing(0),
         )
         .style(move |theme: &cosmic::Theme| {
-            let bc: cosmic::iced::Color = theme.cosmic().accent_color().into();
             cosmic::iced::widget::container::Style {
                 background: Some(cosmic::iced::Background::Color(
                     theme.cosmic().background.base.into()
                 )),
-                border: cosmic::iced::Border { color: bc, width: 1.0, radius: 6.0.into() },
+                border: cosmic::iced::Border {
+                    color: cosmic::iced::Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: 0.0.into(),
+                },
                 ..Default::default()
             }
         })

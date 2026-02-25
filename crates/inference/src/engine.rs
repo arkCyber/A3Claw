@@ -296,7 +296,14 @@ impl InferenceEngine {
     ) -> Result<InferenceResponse, InferenceError> {
         let mut attempted = 0usize;
 
-        for idx in 0..4 {
+        // Only retry backends that have an actual http_backend (idx 1,2,3).
+        // idx=0 is WasiNn which requires a separate wasi_backend instance.
+        let retry_indices: &[usize] = if self.http_backend.is_some() {
+            &[1, 2, 3]
+        } else {
+            &[0]
+        };
+        for &idx in retry_indices {
             if idx == failed_idx {
                 continue;
             }

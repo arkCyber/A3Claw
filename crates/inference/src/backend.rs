@@ -41,14 +41,26 @@ impl HttpBackend {
             .iter()
             .map(|m| serde_json::json!({ "role": m.role, "content": m.content }))
             .collect();
-        serde_json::json!({
-            "model":       self.config.model_name,
-            "messages":    msgs,
-            "max_tokens":  max_tokens,
-            "temperature": temperature,
-            "top_p":       self.config.top_p,
-            "stream":      stream,
-        })
+        match self.config.backend {
+            BackendKind::Ollama => serde_json::json!({
+                "model":       self.config.model_name,
+                "messages":    msgs,
+                "stream":      stream,
+                "options": {
+                    "num_predict": max_tokens,
+                    "temperature": temperature,
+                    "top_p":       self.config.top_p,
+                }
+            }),
+            _ => serde_json::json!({
+                "model":       self.config.model_name,
+                "messages":    msgs,
+                "max_tokens":  max_tokens,
+                "temperature": temperature,
+                "top_p":       self.config.top_p,
+                "stream":      stream,
+            }),
+        }
     }
 
     /// Non-streaming inference — returns the full response text.
