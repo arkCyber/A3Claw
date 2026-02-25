@@ -1704,15 +1704,17 @@ impl cosmic::Application for OpenClawApp {
 
                 // Lazily initialise the inference engine on first use.
                 if self.inference_engine.is_none() {
+                    let ai = &self.config.openclaw_ai;
                     let cfg = InferenceConfig {
-                        backend: BackendKind::Ollama,
-                        endpoint: self.ai_chat.endpoint.clone(),
-                        model_name: self.ai_chat.model_name.clone(),
+                        backend: provider_to_backend_kind(&ai.provider),
+                        endpoint: ai.endpoint.clone(),
+                        model_name: ai.model.clone(),
+                        circuit_breaker_threshold: 999,
                         ..InferenceConfig::default()
                     };
                     match InferenceEngine::new(cfg) {
                         Ok(eng) => {
-                            tracing::info!(model = %self.ai_chat.model_name, endpoint = %self.ai_chat.endpoint, "inference engine initialised");
+                            tracing::info!(model = %ai.model, endpoint = %ai.endpoint, "inference engine initialised");
                             self.inference_engine = Some(Arc::new(eng));
                         }
                         Err(e) => {
@@ -2053,11 +2055,13 @@ impl cosmic::Application for OpenClawApp {
                 );
             }
             AppMessage::StartupInitAI => {
-                tracing::info!(model = %self.ai_chat.model_name, endpoint = %self.ai_chat.endpoint, "[STARTUP] Initializing AI model...");
+                let ai = &self.config.openclaw_ai;
+                tracing::info!(model = %ai.model, endpoint = %ai.endpoint, "[STARTUP] Initializing AI model...");
                 let cfg = InferenceConfig {
-                    backend: BackendKind::Ollama,
-                    endpoint: self.ai_chat.endpoint.clone(),
-                    model_name: self.ai_chat.model_name.clone(),
+                    backend: provider_to_backend_kind(&ai.provider),
+                    endpoint: ai.endpoint.clone(),
+                    model_name: ai.model.clone(),
+                    circuit_breaker_threshold: 999,
                     ..InferenceConfig::default()
                 };
                 match InferenceEngine::new(cfg) {
@@ -2259,11 +2263,14 @@ impl cosmic::Application for OpenClawApp {
             AppMessage::AiSetActiveModel(name) => {
                 tracing::info!(model = %name, "[AI] Setting active model");
                 self.ai_chat.model_name = name.clone();
+                self.config.openclaw_ai.model = name.clone();
                 // Re-init inference engine with new model
+                let ai = &self.config.openclaw_ai;
                 let cfg = InferenceConfig {
-                    backend: BackendKind::Ollama,
-                    endpoint: self.ai_chat.endpoint.clone(),
+                    backend: provider_to_backend_kind(&ai.provider),
+                    endpoint: ai.endpoint.clone(),
                     model_name: name,
+                    circuit_breaker_threshold: 999,
                     ..InferenceConfig::default()
                 };
                 match InferenceEngine::new(cfg) {
@@ -3010,10 +3017,12 @@ impl cosmic::Application for OpenClawApp {
                 if self.claw_nl_mode {
                     // Lazily init inference engine if needed
                     if self.inference_engine.is_none() {
+                        let ai = &self.config.openclaw_ai;
                         let cfg = InferenceConfig {
-                            backend: BackendKind::Ollama,
-                            endpoint: self.ai_chat.endpoint.clone(),
-                            model_name: self.ai_chat.model_name.clone(),
+                            backend: provider_to_backend_kind(&ai.provider),
+                            endpoint: ai.endpoint.clone(),
+                            model_name: ai.model.clone(),
+                            circuit_breaker_threshold: 999,
                             ..InferenceConfig::default()
                         };
                         match InferenceEngine::new(cfg) {
@@ -3750,11 +3759,13 @@ impl cosmic::Application for OpenClawApp {
                         // Always create a fresh InferenceEngine for each agent call.
                         // This avoids the cached circuit breaker accumulating failures
                         // across sessions and permanently blocking the agent.
+                        let ai_cfg = &self.config.openclaw_ai;
                         let cfg = InferenceConfig {
-                            backend: BackendKind::Ollama,
-                            endpoint: self.ai_chat.endpoint.clone(),
-                            model_name: self.ai_chat.model_name.clone(),
-                            circuit_breaker_threshold: 999, // turned off (never trips)
+                            backend: provider_to_backend_kind(&ai_cfg.provider),
+                            endpoint: ai_cfg.endpoint.clone(),
+                            model_name: ai_cfg.model.clone(),
+                            api_key: if ai_cfg.api_key.is_empty() { None } else { Some(ai_cfg.api_key.clone()) },
+                            circuit_breaker_threshold: 999,
                             circuit_breaker_reset: std::time::Duration::from_secs(1),
                             inference_timeout: std::time::Duration::from_secs(120),
                             ..InferenceConfig::default()
@@ -4408,6 +4419,19 @@ impl cosmic::Application for OpenClawApp {
         } else {
             keyboard_sub
         }
+    }
+}
+
+/// Map AiProvider (UI config) to the InferenceEngine BackendKind.
+fn provider_to_backend_kind(provider: &AiProvider) -> BackendKind {
+    match provider {
+        AiProvider::Ollama        => BackendKind::Ollama,
+        AiProvider::LlamaCppHttp  => BackendKind::LlamaCppHttp,
+        AiProvider::OpenAi        => BackendKind::OpenAiCompat,
+        AiProvider::Anthropic     => BackendKind::OpenAiCompat,
+        AiProvider::DeepSeek      => BackendKind::OpenAiCompat,
+        AiProvider::Gemini        => BackendKind::OpenAiCompat,
+        AiProvider::OpenAiCompat  => BackendKind::OpenAiCompat,
     }
 }
 

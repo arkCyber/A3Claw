@@ -123,6 +123,8 @@ impl AgentKind {
 pub enum AiProvider {
     /// Ollama local server (default, privacy-first).
     Ollama,
+    /// llama.cpp HTTP server (OpenAI-compatible, such as llama-server).
+    LlamaCppHttp,
     /// OpenAI API (GPT-4o, GPT-4-turbo, etc.).
     OpenAi,
     /// Anthropic Claude API.
@@ -142,12 +144,13 @@ impl Default for AiProvider {
 impl std::fmt::Display for AiProvider {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AiProvider::Ollama       => write!(f, "Ollama (Local)"),
-            AiProvider::OpenAi       => write!(f, "OpenAI"),
-            AiProvider::Anthropic    => write!(f, "Anthropic Claude"),
-            AiProvider::DeepSeek     => write!(f, "DeepSeek"),
-            AiProvider::Gemini       => write!(f, "Google Gemini"),
-            AiProvider::OpenAiCompat => write!(f, "OpenAI-Compatible"),
+            AiProvider::Ollama        => write!(f, "Ollama (Local)"),
+            AiProvider::LlamaCppHttp  => write!(f, "llama.cpp HTTP"),
+            AiProvider::OpenAi        => write!(f, "OpenAI"),
+            AiProvider::Anthropic     => write!(f, "Anthropic Claude"),
+            AiProvider::DeepSeek      => write!(f, "DeepSeek"),
+            AiProvider::Gemini        => write!(f, "Google Gemini"),
+            AiProvider::OpenAiCompat  => write!(f, "OpenAI-Compatible"),
         }
     }
 }
@@ -156,6 +159,7 @@ impl AiProvider {
     pub fn all() -> &'static [AiProvider] {
         &[
             AiProvider::Ollama,
+            AiProvider::LlamaCppHttp,
             AiProvider::OpenAi,
             AiProvider::Anthropic,
             AiProvider::DeepSeek,
@@ -166,29 +170,31 @@ impl AiProvider {
 
     pub fn default_endpoint(&self) -> &'static str {
         match self {
-            AiProvider::Ollama       => "http://localhost:11434",
-            AiProvider::OpenAi       => "https://api.openai.com/v1",
-            AiProvider::Anthropic    => "https://api.anthropic.com",
-            AiProvider::DeepSeek     => "https://api.deepseek.com/v1",
-            AiProvider::Gemini       => "https://generativelanguage.googleapis.com/v1beta",
-            AiProvider::OpenAiCompat => "http://localhost:1234/v1",
+            AiProvider::Ollama        => "http://localhost:11434",
+            AiProvider::LlamaCppHttp  => "http://localhost:8080",
+            AiProvider::OpenAi        => "https://api.openai.com/v1",
+            AiProvider::Anthropic     => "https://api.anthropic.com",
+            AiProvider::DeepSeek      => "https://api.deepseek.com/v1",
+            AiProvider::Gemini        => "https://generativelanguage.googleapis.com/v1beta",
+            AiProvider::OpenAiCompat  => "http://localhost:1234/v1",
         }
     }
 
     pub fn default_model(&self) -> &'static str {
         match self {
-            AiProvider::Ollama       => "qwen2.5:0.5b",
-            AiProvider::OpenAi       => "gpt-4o-mini",
-            AiProvider::Anthropic    => "claude-3-haiku-20240307",
-            AiProvider::DeepSeek     => "deepseek-chat",
-            AiProvider::Gemini       => "gemini-1.5-flash",
-            AiProvider::OpenAiCompat => "local-model",
+            AiProvider::Ollama        => "qwen2.5:0.5b",
+            AiProvider::LlamaCppHttp  => "local-model",
+            AiProvider::OpenAi        => "gpt-4o-mini",
+            AiProvider::Anthropic     => "claude-3-haiku-20240307",
+            AiProvider::DeepSeek      => "deepseek-chat",
+            AiProvider::Gemini        => "gemini-1.5-flash",
+            AiProvider::OpenAiCompat  => "local-model",
         }
     }
 
     /// Whether this provider requires an API key.
     pub fn requires_api_key(&self) -> bool {
-        !matches!(self, AiProvider::Ollama | AiProvider::OpenAiCompat)
+        !matches!(self, AiProvider::Ollama | AiProvider::LlamaCppHttp | AiProvider::OpenAiCompat)
     }
 }
 
