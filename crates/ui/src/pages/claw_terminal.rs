@@ -3,9 +3,7 @@ use crate::pages::ai_chat::EngineStatus;
 use crate::app::SandboxStatus;
 use crate::theme::Language;
 use cosmic::iced::{Alignment, Length};
-use cosmic::iced::keyboard;
 use cosmic::widget;
-use cosmic::widget::text_editor::{Binding, KeyPress};
 use cosmic::Element;
 
 /// Stable ID for the Claw Terminal input box.
@@ -22,7 +20,8 @@ impl ClawTerminalPage {
     pub fn view<'a>(
         lang: Language,
         history: &'a [ClawEntry],
-        editor: &'a cosmic::widget::text_editor::Content,
+        input: &'a str,
+        is_focused: bool,
         sandbox_status: &'a SandboxStatus,
         ai_status: &'a EngineStatus,
         nl_mode: bool,
@@ -407,31 +406,24 @@ impl ClawTerminalPage {
                     .into(),
                 widget::Space::new(8, 0).into(),
                 widget::container(
-                    widget::text_editor(editor)
-                        .placeholder(placeholder)
-                        .on_action(AppMessage::ClawEditorAction)
-                        .height(Length::Shrink)
-                        .padding([4, 6])
+                    widget::text_input(placeholder, input)
+                        .id(CLAW_INPUT_ID.clone())
+                        .on_input(AppMessage::ClawInputChanged)
+                        .on_submit(|_| AppMessage::ClawSendCommand)
                         .font(cosmic::font::mono())
                         .size(13)
-                        .key_binding(move |kp: KeyPress| {
-                            use keyboard::key::Named;
-                            match kp.key.as_ref() {
-                                // Cmd+Enter → send/run
-                                keyboard::Key::Named(Named::Enter) if kp.modifiers.command() => {
-                                    Some(Binding::Custom(AppMessage::ClawSendCommand))
-                                }
-                                // Enter → newline
-                                keyboard::Key::Named(Named::Enter) => Some(Binding::Enter),
-                                _ => Binding::from_key_press(kp),
-                            }
-                        })
+                        .width(Length::Fill)
                 )
-                .style(move |theme: &cosmic::Theme| {
-                    // 检测是否为焦点状态（这里简化为默认浅灰，实际焦点检测需要额外状态）
+                .style(move |_: &cosmic::Theme| {
+                    // 默认 1px 深灰，激活时 1px 浅灰
+                    let border_color = if is_focused {
+                        cosmic::iced::Color::from_rgba(0.75, 0.75, 0.75, 0.55)
+                    } else {
+                        cosmic::iced::Color::from_rgba(0.38, 0.38, 0.38, 0.70)
+                    };
                     cosmic::iced::widget::container::Style {
                         border: cosmic::iced::Border {
-                            color: cosmic::iced::Color::from_rgba(0.6, 0.6, 0.6, 0.35),
+                            color: border_color,
                             width: 1.0,
                             radius: 4.0.into(),
                         },

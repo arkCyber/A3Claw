@@ -905,10 +905,10 @@ pub struct OpenClawApp {
     rag_folder_name_input: String,
     /// Claw Terminal: command history entries.
     claw_history: Vec<ClawEntry>,
-    /// Claw Terminal: current input buffer (legacy single-line).
+    /// Claw Terminal: current input buffer.
     claw_input: String,
-    /// Claw Terminal: multi-line editor content.
-    claw_editor: cosmic::widget::text_editor::Content,
+    /// Claw Terminal: whether the input box has focus (for border colour).
+    claw_input_focused: bool,
     /// Claw Terminal: monotonic ID counter for entries.
     claw_next_id: u64,
     /// Claw Terminal: whether NL (natural language) mode is active.
@@ -1178,7 +1178,7 @@ impl cosmic::Application for OpenClawApp {
             rag_folder_name_input: String::new(),
             claw_history: Vec::new(),
             claw_input: String::new(),
-            claw_editor: cosmic::widget::text_editor::Content::new(),
+            claw_input_focused: false,
             claw_next_id: 1,
             claw_nl_mode: false,
             claw_attachment: None,
@@ -1497,7 +1497,8 @@ impl cosmic::Application for OpenClawApp {
             NavPage::ClawTerminal => ClawTerminalPage::view(
                 lang,
                 &self.claw_history,
-                &self.claw_editor,
+                &self.claw_input,
+                self.claw_input_focused,
                 &self.sandbox_status,
                 &self.ai_chat.status,
                 self.claw_nl_mode,
@@ -2797,16 +2798,14 @@ impl cosmic::Application for OpenClawApp {
             }
             // ── Claw Terminal ──────────────────────────────────────────────
             AppMessage::ClawInputChanged(s) => {
-                tracing::info!("[IME] ClawInputChanged: {:?} ({} chars)", s, s.chars().count());
                 self.claw_input = s;
             }
-            AppMessage::ClawEditorAction(action) => {
-                self.claw_editor.perform(action);
-                // Keep claw_input in sync for legacy send path
-                let raw = self.claw_editor.text();
-                self.claw_input = raw.trim_end_matches('\n').to_string();
+            AppMessage::ClawEditorAction(_action) => {
+                // text_editor no longer used for main input; ignore stale actions
             }
-            AppMessage::ClawInputFocused => {}
+            AppMessage::ClawInputFocused => {
+                self.claw_input_focused = true;
+            }
 
             // ── Image attachment ───────────────────────────────────────────
             AppMessage::ClawPickImage => {
@@ -2947,16 +2946,15 @@ impl cosmic::Application for OpenClawApp {
             }
             AppMessage::ClawVoiceTranscribed(text) => {
                 self.claw_voice_status = None;
-                // Append transcribed text into both claw_input and claw_editor
-                let current = self.claw_editor.text();
-                let current = current.trim_end_matches('\n');
-                let new_content = if current.is_empty() {
-                    text.clone()
+                if self.claw_input.is_empty() {
+                    self.claw_input = text;
                 } else {
-                    format!("{} {}", current, text)
-                };
-                self.claw_input = new_content.clone();
-                self.claw_editor = cosmic::widget::text_editor::Content::with_text(&new_content);
+                    self.claw_input.push(' ');
+                    self.claw_input.push_str(&text);
+                }
+                return cosmic::widget::text_input::focus(
+                    crate::pages::claw_terminal::CLAW_INPUT_ID.clone(),
+                ).map(cosmic::Action::App);
             }
             AppMessage::ClawVoiceError(err) => {
                 self.claw_recording = false;
@@ -2967,25 +2965,17 @@ impl cosmic::Application for OpenClawApp {
                 self.claw_history.clear();
             }
             AppMessage::ClawQuickAction(action) => {
-                let cmd = action.command().to_string();
-                self.claw_input = cmd.clone();
-                self.claw_editor = cosmic::widget::text_editor::Content::with_text(&cmd);
+                self.claw_input = action.command().to_string();
                 return self.update(AppMessage::ClawSendCommand);
             }
             AppMessage::ClawSendCommand => {
-                // Prefer editor content; fall back to legacy claw_input
-                let editor_text = self.claw_editor.text();
-                let raw = if !editor_text.trim().is_empty() {
-                    editor_text.trim_end_matches('\n').trim().to_string()
-                } else {
-                    self.claw_input.trim().to_string()
-                };
+                let raw = self.claw_input.trim().to_string();
                 // Allow send when attachment present even if text is empty
                 if raw.is_empty() && self.claw_attachment.is_none() {
                     return Task::none();
                 }
                 self.claw_input.clear();
-                self.claw_editor = cosmic::widget::text_editor::Content::new();
+                self.claw_input_focused = false;
 
                 tracing::info!("[CLAW] Send command: {}", raw);
                 tracing::info!("[CLAW] Selected agent: {:?}", self.claw_selected_agent_id);
