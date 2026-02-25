@@ -72,27 +72,43 @@ full committed string in the `text` field.
 
 ---
 
-## 4. IME candidate window position (macOS NSView coordinate system)
+## 4. IME candidate window position (macOS coordinate mapping)
 
 **File:** `iced/winit/src/program.rs`
 
-**Problem:** macOS `NSView` uses a **Y-up** coordinate system (origin at
-bottom-left). Passing `y = window_height - N` places the anchor far above
-the visible content, pushing the candidate list off-screen toward the Dock.
+**Problem:** Candidate box was appearing over the Dock (screen_y ≈ 17).
 
-**Fix:** Use `y = 50` (50 logical px above the bottom of the view), which
-corresponds to the bottom edge of the input bar. macOS floats the candidate
-list *above* this anchor.
+**Root cause analysis (confirmed by log):**
+- `WinitView.isFlipped = true` → view coords are top-left origin, Y-down
+- `firstRectForCharacterRange` calls `convertRect_toView` (flip Y) then
+  `convertRectToScreen` (to screen Y-up coords)
+- Measured: `view_y=770` in `h=820` → `screen_y=17`
+- Formula: `screen_y = (h - view_y) + window_bottom_offset`
+  where `window_bottom_offset ≈ -33` for this window
+
+**Fix:** Target `screen_y ≈ 80` (just above input bar, inside window):
+```
+view_y = h - target_screen_y - |window_bottom_offset|
+       = 820 - 80 - 33 = 707
+       = h - 113
+```
 
 ```rust
+// On Focused(true):
+let ime_y = (logical_size.height as f64 - 113.0).max(0.0);
 window.raw.set_ime_cursor_area(
     winit::dpi::Position::Logical(
-        winit::dpi::LogicalPosition::new(80.0, 50.0),
+        winit::dpi::LogicalPosition::new(80.0, ime_y),
     ),
     winit::dpi::Size::Logical(
         winit::dpi::LogicalSize::new(400.0, 28.0),
     ),
 );
+```
+
+**Verification log:**
+```
+view_pos=(80,707) view_size=(400,28) => screen=(156,80 400x28)  ✓
 ```
 
 ---
