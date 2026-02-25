@@ -3514,16 +3514,20 @@ impl cosmic::Application for OpenClawApp {
                                 model_name: self.ai_chat.model_name.clone(),
                                 ..InferenceConfig::default()
                             };
+                            eprintln!("[CLAW-AGENT] init engine: endpoint={} model={}", self.ai_chat.endpoint, self.ai_chat.model_name);
                             match InferenceEngine::new(cfg) {
                                 Ok(eng) => {
-                                    tracing::info!("[CLAW-AGENT] inference engine initialised");
+                                    eprintln!("[CLAW-AGENT] engine initialised OK");
                                     self.inference_engine = Some(Arc::new(eng));
                                 }
                                 Err(e) => {
                                     let err = format!("AI 推理引擎初始化失败: {e}");
+                                    eprintln!("[CLAW-AGENT] engine init FAILED: {err}");
                                     return self.update(AppMessage::ClawNlPlanError { entry_id, error: err });
                                 }
                             }
+                        } else {
+                            eprintln!("[CLAW-AGENT] engine already initialised");
                         }
 
                         // Build multi-turn conversation: system + history + new user message
@@ -3551,7 +3555,10 @@ impl cosmic::Application for OpenClawApp {
                         messages.extend(history_snapshot);
 
                         let engine_clone = self.inference_engine.as_ref().unwrap().clone();
-                        tracing::info!("[CLAW-AGENT] {} messages (incl system) to agent {}", messages.len(), agent_id_clone);
+                        eprintln!("[CLAW-AGENT] sending {} messages to agent {}", messages.len(), agent_id_clone);
+                        for (i, m) in messages.iter().enumerate() {
+                            eprintln!("  msg[{}] role={} content={:.80}", i, m.role, m.content);
+                        }
                         return Task::perform(
                             async move {
                                 let start = std::time::Instant::now();
@@ -3563,15 +3570,21 @@ impl cosmic::Application for OpenClawApp {
                                     stream: false,
                                 };
                                 match engine_clone.infer(req).await {
-                                    Ok(resp) => AppMessage::ClawAgentResponse {
-                                        agent_id: agent_id_clone,
-                                        content: resp.content,
-                                        latency_ms: start.elapsed().as_millis() as u64,
-                                    },
-                                    Err(e) => AppMessage::ClawNlPlanError {
-                                        entry_id,
-                                        error: format!("AI 推理失败: {e}"),
-                                    },
+                                    Ok(resp) => {
+                                        eprintln!("[CLAW-AGENT] response ({} ms): {:.120}", start.elapsed().as_millis(), resp.content);
+                                        AppMessage::ClawAgentResponse {
+                                            agent_id: agent_id_clone,
+                                            content: resp.content,
+                                            latency_ms: start.elapsed().as_millis() as u64,
+                                        }
+                                    }
+                                    Err(e) => {
+                                        eprintln!("[CLAW-AGENT] infer error: {e}");
+                                        AppMessage::ClawNlPlanError {
+                                            entry_id,
+                                            error: format!("AI 推理失败: {e}"),
+                                        }
+                                    }
                                 }
                             },
                             cosmic::Action::App,
