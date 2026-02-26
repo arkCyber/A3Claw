@@ -8,6 +8,7 @@ members = [
     "crates/store",
     "crates/inference",
     "crates/voice",
+    "crates/wasi-nn-infer",
 ]
 resolver = "2"
 
@@ -48,9 +49,7 @@ parking_lot = "0.12"
 # WasmEdge SDK — supported on macOS and Linux; Windows support is experimental.
 # Crates that need WasmEdge declare it as optional and gate it behind the
 # `wasm-sandbox` feature flag so Windows builds can skip it.
-wasmedge-sdk = { version = "0.13", features = ["async"] }
-wasmedge-sys = { version = "0.17", features = ["async"] }
-wasmedge-types = "0.4"
+wasmedge-sdk = { version = "0.14", features = ["async", "wasi_nn"] }
 
 # libcosmic UI
 # winit_wgpu selects the correct GPU backend automatically:

@@ -255,7 +255,7 @@ impl WasiNnBackend {
         let t0 = Instant::now();
         info!(request_id, model = %model_path.display(), "WASI-NN inference started");
 
-        let prompt = build_chat_prompt(messages);
+        let prompt = build_wasi_nn_prompt(messages);
 
         // Execute via WasmEdge WASI-NN ggml graph.
         let content = wasmedge_wasi_nn_infer(
@@ -310,4 +310,191 @@ fn compute_sha256(path: &std::path::Path) -> Result<String, InferenceError> {
         hasher.update(&buf[..n]);
     }
     Ok(hex::encode(hasher.finalize()))
+}
+
+// ── WasmEdge WASI-NN inference helper ────────────────────────────────────────
+
+/// Embedded WASM inference module compiled from crates/wasi-nn-infer at build time.
+#[cfg(feature = "wasi-nn")]
+static WASI_NN_INFER_WASM: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/wasi_nn_infer.wasm"));
+
+/// In-process llama.cpp inference via WasmEdge WASI-NN plugin.
+///
+/// Pipeline:
+///   1. Load wasi_nn plugin from WasmEdge default paths.
+///   2. Register GGUF model with alias "default" via nn_preload.
+///   3. Write JSON payload to a sandboxed temp dir (WasiIoPair).
+///   4. Build WasmEdge VM: WASI module + wasi_nn plugin module.
+///   5. Run embedded WASM module (_start reads req, writes resp).
+///   6. Parse and return the JSON response text.
+///
+/// All CPU-bound work runs in spawn_blocking to keep the async executor free.
+#[cfg(feature = "wasi-nn")]
+async fn wasmedge_wasi_nn_infer(
+    model_path: &std::path::Path,
+    prompt: &str,
+    max_tokens: u32,
+    temperature: f32,
+    top_p: f32,
+) -> Result<String, anyhow::Error> {
+    use std::collections::HashMap;
+    use wasmedge_sdk::{
+        params,
+        plugin::{ExecutionTarget, GraphEncoding, NNPreload, PluginManager},
+        vm::SyncInst,
+        wasi::WasiModule,
+        Module, Store, Vm,
+    };
+
+    let model_path = model_path.to_path_buf();
+    let prompt     = prompt.to_string();
+
+    tokio::task::spawn_blocking(move || -> Result<String, anyhow::Error> {
+        // 1. Load plugins; verify wasi_nn is available.
+        PluginManager::load(None)?;
+        let plugin_names = PluginManager::names();
+        if !plugin_names.iter().any(|n| n.contains("wasi_nn")) {
+            return Err(anyhow::anyhow!(
+                "wasi_nn plugin not found. \
+                 Install WasmEdge with: bash <(curl -sSf \
+                 https://raw.githubusercontent.com/WasmEdge/WasmEdge/refs/heads/master/utils/install.sh) \
+                 -- --plugins wasi_nn-ggml"
+            ));
+        }
+
+        // 2. Register GGUF model under alias "default".
+        PluginManager::nn_preload(vec![NNPreload::new(
+            "default",
+            GraphEncoding::GGML,
+            ExecutionTarget::AUTO,
+            &model_path,
+        )]);
+
+        // 3. Build JSON payload.
+        let json_payload = serde_json::json!({
+            "model":        "default",
+            "prompt":       prompt,
+            "n_predict":    max_tokens,
+            "temperature":  temperature,
+            "top_p":        top_p,
+            "ctx_size":     4096,
+            "n_gpu_layers": 0,
+        }).to_string();
+
+        // 4. Create sandboxed temp dir.
+        let io = WasiIoPair::new(&json_payload)?;
+
+        // 5. Configure WASI module.
+        //    envs: "KEY=VALUE" strings.
+        //    preopens: "GUEST:HOST" mapping (guest "." → host temp dir).
+        let req_name  = io.req_path.file_name()
+            .and_then(|n| n.to_str()).unwrap_or("request.json");
+        let resp_name = io.resp_path.file_name()
+            .and_then(|n| n.to_str()).unwrap_or("response.json");
+        let env_req   = format!("OPENCLAW_REQ={}",  req_name);
+        let env_resp  = format!("OPENCLAW_RESP={}", resp_name);
+        let preopen   = format!(".:{}", io.dir.to_str().unwrap_or("/tmp"));
+
+        let mut wasi_mod = WasiModule::create(
+            Some(vec!["openclaw_wasi_nn_infer"]),
+            Some(vec![env_req.as_str(), env_resp.as_str()]),
+            Some(vec![preopen.as_str()]),
+        )?;
+
+        // 6. Create wasi_nn plugin instance.
+        let mut wasi_nn_inst = PluginManager::create_plugin_instance(
+            "wasi_nn", "wasi_nn",
+        ).map_err(|e| anyhow::anyhow!("wasi_nn plugin instance failed: {:?}", e))?;
+
+        // 7. Assemble VM: WasiModule.as_mut() → &mut Instance which is SyncInst.
+        let mut instances: HashMap<String, &mut dyn SyncInst> = HashMap::new();
+        instances.insert(wasi_mod.name().to_string(), wasi_mod.as_mut());
+        instances.insert("wasi_nn".to_string(), &mut wasi_nn_inst);
+
+        let mut vm = Vm::new(
+            Store::new(None, instances)
+                .map_err(|e| anyhow::anyhow!("Store::new failed: {:?}", e))?,
+        );
+
+        // 8. Load embedded WASM module and run _start.
+        let wasm_mod = Module::from_bytes(None, WASI_NN_INFER_WASM)
+            .map_err(|e| anyhow::anyhow!("WASM module load failed: {:?}", e))?;
+        vm.register_module(None, wasm_mod)
+            .map_err(|e| anyhow::anyhow!("register_module failed: {:?}", e))?;
+        vm.run_func(None, "_start", params!())
+            .map_err(|e| anyhow::anyhow!("_start failed: {:?}", e))?;
+
+        // 9. Read and parse JSON response.
+        let raw = std::fs::read_to_string(&io.resp_path)
+            .map_err(|e| anyhow::anyhow!("read response failed: {}", e))?;
+        parse_wasi_nn_response(&raw)
+    })
+    .await?
+}
+
+// ── Sandboxed temp I/O dir ────────────────────────────────────────────────────
+
+/// Temp directory pair for sandboxed WASM file exchange: req.json in, resp.json out.
+#[cfg(feature = "wasi-nn")]
+struct WasiIoPair {
+    dir:       std::path::PathBuf,
+    req_path:  std::path::PathBuf,
+    resp_path: std::path::PathBuf,
+}
+
+#[cfg(feature = "wasi-nn")]
+impl WasiIoPair {
+    fn new(request_json: &str) -> Result<Self, anyhow::Error> {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.subsec_nanos())
+            .unwrap_or(0);
+        let dir = std::env::temp_dir()
+            .join(format!("openclaw_wasi_nn_{}_{}", std::process::id(), ts));
+        std::fs::create_dir_all(&dir)?;
+        let req_path  = dir.join("request.json");
+        let resp_path = dir.join("response.json");
+        std::fs::write(&req_path, request_json.as_bytes())?;
+        std::fs::File::create(&resp_path)?;
+        Ok(Self { dir, req_path, resp_path })
+    }
+}
+
+#[cfg(feature = "wasi-nn")]
+impl Drop for WasiIoPair {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.dir);
+    }
+}
+
+// ── Response parser ───────────────────────────────────────────────────────────
+
+/// Parse the WASM module output: `{"ok":true,"text":"..."}`.
+#[cfg(feature = "wasi-nn")]
+fn parse_wasi_nn_response(raw: &str) -> Result<String, anyhow::Error> {
+    let v: serde_json::Value = serde_json::from_str(raw.trim())
+        .map_err(|e| anyhow::anyhow!(
+            "invalid JSON from WASM module: {} — raw snippet: {:?}",
+            e, &raw[..raw.len().min(200)]
+        ))?;
+    if v["ok"].as_bool() == Some(true) {
+        Ok(v["text"].as_str().unwrap_or("").to_string())
+    } else {
+        let err = v["error"].as_str().unwrap_or("unknown error");
+        Err(anyhow::anyhow!("WASI-NN inference error: {}", err))
+    }
+}
+
+// ── ChatML prompt builder ─────────────────────────────────────────────────────
+
+/// Build a ChatML-format prompt string from a conversation history.
+#[cfg(feature = "wasi-nn")]
+fn build_wasi_nn_prompt(messages: &[ConversationTurn]) -> String {
+    let mut out = String::new();
+    for m in messages {
+        out.push_str(&m.content);
+        out.push('\n');
+    }
+    out
 }

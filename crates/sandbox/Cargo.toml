@@ -29,12 +29,10 @@ hex = { workspace = true }
 # WasmEdge — optional; requires native WasmEdge library (macOS + Linux).
 # On Windows, build without --features wasm-sandbox.
 wasmedge-sdk = { workspace = true, optional = true }
-wasmedge-sys = { workspace = true, optional = true }
-wasmedge-types = { workspace = true, optional = true }
 
 openclaw-security = { path = "../security" }
 
 [features]
 # Full WasmEdge sandbox (macOS + Linux).
-wasm-sandbox = ["wasmedge-sdk", "wasmedge-sys", "wasmedge-types"]
+wasm-sandbox = ["wasmedge-sdk"]
 default = ["wasm-sandbox"]

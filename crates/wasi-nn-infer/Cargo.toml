@@ -1,0 +1,20 @@
+[package]
+name = "openclaw-wasi-nn-infer"
+version.workspace = true
+edition.workspace = true
+description = "WASM module compiled to wasm32-wasip1 that calls WASI-NN host functions for in-process llama.cpp inference."
+
+[[bin]]
+name = "openclaw_wasi_nn_infer"
+path = "src/main.rs"
+
+[dependencies]
+# wasi crate provides WASI-NN host function bindings when targeting wasm32-wasip1
+wasi = { version = "0.13", features = ["std"] }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+panic = "abort"
