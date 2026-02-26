@@ -224,12 +224,43 @@ Every OpenClaw Skill is classified before execution:
 | Shell execution                 | ⏳ Confirm                   | High-risk commands denied immediately |
 | Sensitive paths (`.ssh/`, etc.) | 🚫 Deny                      | Hard-coded security rules             |
 
+## AI Inference Backend
+
+OpenClaw+ includes an integrated AI inference engine with multiple backend options:
+
+- **WASI-NN** (WasmEdge + llama.cpp): In-process inference with GGUF models
+- **LlamaCppHttp**: HTTP API for llama.cpp server
+- **Ollama**: Local Ollama server
+- **OpenAI-compatible**: OpenAI, Anthropic, DeepSeek, Gemini, etc.
+
+### WASI-NN Quick Start
+
+```bash
+# Install WasmEdge with wasi_nn plugin
+curl -sSf https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install.sh \
+  | bash -s -- --plugins wasi_nn-ggml
+
+# Download a GGUF model
+mkdir -p models/gguf
+curl -L -o models/gguf/qwen2.5-0.5b-instruct-q4_k_m.gguf \
+  "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+
+# Build with wasi-nn feature
+cargo build --release --features wasi-nn
+
+# Run tests
+cargo test --features wasi-nn --test wasi_nn_integration
+```
+
+📖 **Full guide**: [WASI-NN Integration Guide](docs/WASI_NN_GUIDE.md)
+
 ## Tech Stack
 
-- **Runtime**: [WasmEdge](https://wasmedge.org/) 0.13+ (WASI + QuickJS)
+- **Runtime**: [WasmEdge](https://wasmedge.org/) 0.16+ (WASI + QuickJS + wasi_nn)
 - **UI framework**: [libcosmic](https://github.com/pop-os/libcosmic) (iced-based)
 - **Language**: Rust 2021 Edition
 - **Async**: Tokio
+- **AI Inference**: wasmedge-sdk 0.14 + llama.cpp (via WASI-NN)
 - **Configuration**: TOML
 - **Distribution**: GitHub Actions + cargo-dist
 
