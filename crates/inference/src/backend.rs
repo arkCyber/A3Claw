@@ -344,7 +344,7 @@ async fn wasmedge_wasi_nn_infer(
         plugin::{ExecutionTarget, GraphEncoding, NNPreload, PluginManager},
         vm::SyncInst,
         wasi::WasiModule,
-        Module, Store, Vm,
+        AsInstance, Module, Store, Vm,
     };
 
     let model_path = model_path.to_path_buf();
@@ -403,14 +403,12 @@ async fn wasmedge_wasi_nn_infer(
         )?;
 
         // 6. Create wasi_nn plugin instance.
-        let mut wasi_nn_inst = PluginManager::create_plugin_instance(
-            "wasi_nn", "wasi_nn",
-        ).map_err(|e| anyhow::anyhow!("wasi_nn plugin instance failed: {:?}", e))?;
+        let mut wasi_nn_mod = PluginManager::create_plugin_instance("wasi_nn", "wasi_nn")?;
 
         // 7. Assemble VM: WasiModule.as_mut() → &mut Instance which is SyncInst.
         let mut instances: HashMap<String, &mut dyn SyncInst> = HashMap::new();
         instances.insert(wasi_mod.name().to_string(), wasi_mod.as_mut());
-        instances.insert("wasi_nn".to_string(), &mut wasi_nn_inst);
+        instances.insert("wasi_nn".to_string(), &mut wasi_nn_mod);
 
         let mut vm = Vm::new(
             Store::new(None, instances)
