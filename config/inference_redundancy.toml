@@ -1,0 +1,135 @@
+# OpenClaw+ 多后端冗余配置示例
+# 支持 Ollama、llama.cpp、OpenAI、DeepSeek 等多种后端
+
+# ============================================================================
+# 主服务：Ollama (本地 GPU 加速)
+# ============================================================================
+[primary]
+backend = "ollama"
+endpoint = "http://localhost:11434"
+model_name = "qwen2.5:0.5b"
+max_tokens = 2048
+temperature = 0.7
+top_p = 0.95
+inference_timeout_secs = 30
+circuit_breaker_threshold = 3
+circuit_breaker_reset_secs = 60
+context_window = 8192
+
+# ============================================================================
+# 备份服务 1：llama.cpp server (本地备份)
+# ============================================================================
+[backup_local]
+backend = "llama_cpp_http"
+endpoint = "http://localhost:8080"
+model_name = "qwen2.5-0.5b-instruct-q4_k_m"
+max_tokens = 2048
+temperature = 0.7
+top_p = 0.95
+inference_timeout_secs = 30
+circuit_breaker_threshold = 3
+circuit_breaker_reset_secs = 60
+context_window = 8192
+
+# ============================================================================
+# 备份服务 2：OpenAI API (云端冗余)
+# ============================================================================
+[backup_openai]
+backend = "openai_compat"
+endpoint = "https://api.openai.com/v1"
+model_name = "gpt-3.5-turbo"
+# API Key 从环境变量读取: export OPENAI_API_KEY="sk-..."
+# 或直接配置（不推荐，安全风险）:
+# api_key = "sk-your-key-here"
+max_tokens = 2048
+temperature = 0.7
+top_p = 0.95
+inference_timeout_secs = 60
+circuit_breaker_threshold = 5
+circuit_breaker_reset_secs = 120
+context_window = 16384
+
+# ============================================================================
+# 备份服务 3：DeepSeek API (高性价比云端服务)
+# ============================================================================
+[backup_deepseek]
+backend = "openai_compat"
+endpoint = "https://api.deepseek.com/v1"
+model_name = "deepseek-chat"
+# API Key 从环境变量读取: export DEEPSEEK_API_KEY="sk-..."
+# 或直接配置:
+# api_key = "sk-your-deepseek-key"
+max_tokens = 2048
+temperature = 0.7
+top_p = 0.95
+inference_timeout_secs = 60
+circuit_breaker_threshold = 5
+circuit_breaker_reset_secs = 120
+context_window = 32768
+
+# ============================================================================
+# 备份服务 4：Azure OpenAI (企业级云端服务)
+# ============================================================================
+[backup_azure]
+backend = "openai_compat"
+# Azure OpenAI endpoint 格式:
+# https://{your-resource-name}.openai.azure.com/openai/deployments/{deployment-id}/chat/completions?api-version=2024-02-15-preview
+endpoint = "https://your-resource.openai.azure.com/openai/deployments/gpt-35-turbo"
+model_name = "gpt-3.5-turbo"
+# Azure 使用 api-key header
+# api_key = "your-azure-api-key"
+max_tokens = 2048
+temperature = 0.7
+top_p = 0.95
+inference_timeout_secs = 60
+circuit_breaker_threshold = 5
+circuit_breaker_reset_secs = 120
+context_window = 16384
+
+# ============================================================================
+# 备份服务 5：远程 llama.cpp 服务器 (跨地域部署)
+# ============================================================================
+[backup_remote]
+backend = "openai_compat"
+endpoint = "http://remote-server.example.com:8080"
+model_name = "qwen2.5-7b-instruct"
+# 如果远程服务器需要认证
+# api_key = "your-remote-api-key"
+max_tokens = 2048
+temperature = 0.7
+top_p = 0.95
+inference_timeout_secs = 60
+circuit_breaker_threshold = 5
+circuit_breaker_reset_secs = 120
+context_window = 32768
+
+# ============================================================================
+# 配置说明
+# ============================================================================
+# 
+# 1. 后端类型 (backend):
+#    - "wasi_nn"          : WasmEdge WASI-NN (需要 model_path)
+#    - "llama_cpp_http"   : llama.cpp HTTP server
+#    - "ollama"           : Ollama 本地服务
+#    - "openai_compat"    : OpenAI 兼容 API (OpenAI/DeepSeek/Azure/自建)
+#
+# 2. API Key 安全最佳实践:
+#    - 优先使用环境变量: export OPENAI_API_KEY="sk-..."
+#    - 避免在配置文件中硬编码 API Key
+#    - 使用 .env 文件 (确保加入 .gitignore)
+#    - 生产环境使用密钥管理服务 (AWS Secrets Manager, Azure Key Vault)
+#
+# 3. 故障转移策略:
+#    - 主服务失败 → 本地备份 → 云端备份
+#    - circuit_breaker_threshold: 连续失败次数阈值
+#    - circuit_breaker_reset: 熔断器重置时间
+#
+# 4. 性能优化:
+#    - 本地服务优先 (低延迟)
+#    - 云端服务作为最后保障 (高可用)
+#    - 根据实际延迟调整 timeout
+#
+# 5. 成本控制:
+#    - 优先使用本地服务 (免费)
+#    - DeepSeek 性价比高 (0.14¥/M tokens)
+#    - OpenAI 作为最后备份 (较贵)

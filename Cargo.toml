@@ -9,6 +9,8 @@ members = [
     "crates/inference",
     "crates/voice",
     "crates/wasi-nn-infer",
+    "crates/intel",
+    "crates/agent-executor",
 ]
 resolver = "2"
 
@@ -44,7 +46,10 @@ flume = "0.11"
 futures-util = "0.3"
 
 # Synchronisation primitives
-parking_lot = "0.12"
+parking_lot = { version = "0.12" }
+
+# UUID generation
+uuid = { version = "1.7", features = ["v4"] }
 
 # WasmEdge SDK — supported on macOS and Linux; Windows support is experimental.
 # Crates that need WasmEdge declare it as optional and gate it behind the

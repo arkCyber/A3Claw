@@ -27,6 +27,8 @@ openclaw-inference = { path = "../inference" }
 openclaw-store = { path = "../store" }
 openclaw-storage = { path = "../storage" }
 openclaw-voice = { path = "../voice" }
+openclaw-intel = { path = "../intel" }
+openclaw-agent-executor = { path = "../agent-executor" }
 
 # HTTP client for plugin-mode gateway calls
 reqwest = { version = "0.12", features = [

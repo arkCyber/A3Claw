@@ -1,0 +1,24 @@
+[package]
+name = "openclaw-intel"
+version.workspace = true
+edition.workspace = true
+description = "全网情报员核心引擎：HTTP 抓取、RSS 解析、竞品监控、AI 摘要"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+
+reqwest = { version = "0.12", features = [
+    "json",
+    "rustls-tls",
+], default-features = false }
+scraper = "0.20"
+roxmltree = "0.19"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }

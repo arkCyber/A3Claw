@@ -1,0 +1,79 @@
+# OpenClaw+ 推理服务器管理配置
+# 与 Ollama 管理配置一样，在通用管理中配置
+
+# ============================================================================
+# 服务器列表
+# ============================================================================
+
+[[servers]]
+id = "ollama-primary"
+name = "Ollama (主服务)"
+type = "ollama"
+endpoint = "http://localhost:11434"
+port = 11434
+enabled = true
+auto_start = false  # Ollama 需要手动启动
+model = "qwen2.5:0.5b"
+
+[[servers]]
+id = "llama-cpp-backup"
+name = "llama.cpp (备份)"
+type = "llama_cpp"
+endpoint = "http://localhost:8080"
+port = 8080
+enabled = true
+auto_start = true  # 可以自动启动
+model_path = "models/gguf/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+threads = 8
+
+[[servers]]
+id = "openai-cloud"
+name = "OpenAI (云端)"
+type = "openai"
+endpoint = "https://api.openai.com/v1"
+port = 443
+enabled = false  # 默认禁用，需要 API key
+auto_start = false
+model = "gpt-3.5-turbo"
+# api_key 从环境变量 OPENAI_API_KEY 读取
+
+[[servers]]
+id = "deepseek-cloud"
+name = "DeepSeek (云端)"
+type = "deepseek"
+endpoint = "https://api.deepseek.com/v1"
+port = 443
+enabled = false  # 默认禁用，需要 API key
+auto_start = false
+model = "deepseek-chat"
+# api_key 从环境变量 DEEPSEEK_API_KEY 读取
+
+# ============================================================================
+# 健康检查配置
+# ============================================================================
+[health_check]
+interval_seconds = 30  # 每 30 秒检查一次
+timeout_seconds = 5    # 超时时间
+retry_count = 3        # 重试次数
+
+# ============================================================================
+# 故障转移配置
+# ============================================================================
+[failover]
+enabled = true
+# 故障转移顺序（按优先级）
+priority = [
+    "ollama-primary",
+    "llama-cpp-backup",
+    "deepseek-cloud",
+    "openai-cloud"
+]
+
+# ============================================================================
+# 资源监控配置
+# ============================================================================
+[monitoring]
+enabled = true
+update_interval_seconds = 5  # 每 5 秒更新资源使用情况
+log_to_file = true
+log_path = "~/.openclaw-plus/server-monitor.log"

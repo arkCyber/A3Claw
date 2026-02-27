@@ -124,6 +124,8 @@ pub enum AgentRole {
     NewsSecretary,
     /// 安全代码审计员 — SAST + Git 提交监控
     SecurityCodeAuditor,
+    /// 全网情报员 — 竞品监控 + 行业新闻抓取 + AI 摘要
+    IntelOfficer,
     Custom { label: String },
 }
 
@@ -146,6 +148,7 @@ impl std::fmt::Display for AgentRole {
             AgentRole::FinanceProcurement   => write!(f, "Finance & Procurement"),
             AgentRole::NewsSecretary        => write!(f, "News Secretary"),
             AgentRole::SecurityCodeAuditor  => write!(f, "Security Code Auditor"),
+            AgentRole::IntelOfficer         => write!(f, "Intel Officer"),
             AgentRole::Custom { label }     => write!(f, "{}", label),
         }
     }
@@ -158,6 +161,7 @@ impl AgentRole {
             "Security Auditor", "Data Analyst", "Customer Support",
             "Knowledge Officer", "Social Media Manager", "Inbox Triage Agent",
             "Finance & Procurement", "News Secretary", "Security Code Auditor",
+            "Intel Officer",
         ]
     }
     pub fn default_network_allowlist(&self) -> Vec<String> {
@@ -187,6 +191,17 @@ impl AgentRole {
             AgentRole::SecurityCodeAuditor  => vec![
                 "api.github.com".into(), "github.com".into(),
             ],
+            AgentRole::IntelOfficer         => vec![
+                "news.ycombinator.com".into(),
+                "techcrunch.com".into(),
+                "36kr.com".into(),
+                "sspai.com".into(),
+                "v2ex.com".into(),
+                "feeds.feedburner.com".into(),
+                "rss.36kr.com".into(),
+                "hnrss.org".into(),
+                "www.producthunt.com".into(),
+            ],
             AgentRole::Custom { .. }        => vec![],
         }
     }
@@ -206,6 +221,7 @@ impl AgentRole {
             AgentRole::FinanceProcurement   => "财务采购员",
             AgentRole::NewsSecretary        => "新闻信息秘书",
             AgentRole::SecurityCodeAuditor  => "安全代码审计员",
+            AgentRole::IntelOfficer         => "全网情报员",
             AgentRole::Custom { .. }        => "自定义员工",
         }
     }
@@ -225,6 +241,7 @@ impl AgentRole {
             AgentRole::FinanceProcurement   => "https://api.dicebear.com/7.x/bottts/svg?seed=finance-proc&backgroundColor=fff9c4",
             AgentRole::NewsSecretary        => "https://api.dicebear.com/7.x/bottts/svg?seed=news-secretary&backgroundColor=f3e5f5",
             AgentRole::SecurityCodeAuditor  => "https://api.dicebear.com/7.x/bottts/svg?seed=sec-code-audit&backgroundColor=fbe9e7",
+            AgentRole::IntelOfficer         => "https://api.dicebear.com/7.x/bottts/svg?seed=intel-officer&backgroundColor=cfe8ff",
             AgentRole::Custom { label: _ }  => "https://api.dicebear.com/7.x/bottts/svg?seed=custom-agent&backgroundColor=eeeeee",
         }
     }
@@ -244,6 +261,7 @@ impl AgentRole {
             AgentRole::FinanceProcurement   => "💰",
             AgentRole::NewsSecretary        => "📰",
             AgentRole::SecurityCodeAuditor  => "🔐",
+            AgentRole::IntelOfficer         => "🕵️",
             AgentRole::Custom { .. }        => "⚙",
         }
     }
@@ -263,6 +281,7 @@ impl AgentRole {
             AgentRole::FinanceProcurement   => "付款审批流程、采购单生成、费用报销自动化",
             AgentRole::NewsSecretary        => "每日定时推送热点新闻，重要事件实时提醒，多渠道分发",
             AgentRole::SecurityCodeAuditor  => "SAST 静态分析，Git 提交监控，单元测试用例生成",
+            AgentRole::IntelOfficer         => "利用浏览器抓取能力监控竞争对手动态及行业新闻，AI 自动摘要并推送报告",
             AgentRole::Custom { .. }        => "自定义角色",
         }
     }

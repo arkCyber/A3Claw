@@ -1,0 +1,28 @@
+[package]
+name = "openclaw-agent-executor"
+version.workspace = true
+edition.workspace = true
+description = "Agent execution engine: ReAct loop, Skill dispatch, Tool bridge, per-Agent session management"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+reqwest = { version = "0.12", features = [
+    "json",
+    "rustls-tls",
+], default-features = false }
+uuid = { workspace = true }
+parking_lot = { workspace = true }
+dirs = { workspace = true }
+
+openclaw-security = { path = "../security" }
+openclaw-storage = { path = "../storage" }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
+tempfile = "3.8"

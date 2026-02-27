@@ -212,6 +212,17 @@ pub enum AppMessage {
     AgentRenameCancelled,
     /// Agent list loaded from DB.
     AgentListLoaded(Vec<openclaw_security::AgentProfile>),
+    // ── Agent execution (AgentExecutor) messages ─────────────────────────
+    /// User clicked "Run Task" for the selected agent.
+    AgentRunTask,
+    /// Task goal input changed.
+    AgentTaskGoalChanged(String),
+    /// AgentExecutor emitted an event (streamed from background task).
+    AgentExecutorEvent(openclaw_agent_executor::ExecutorEvent),
+    /// Stop/cancel the running task.
+    AgentStopTask,
+    /// System readiness check result.
+    AgentReadinessChecked(openclaw_agent_executor::bootstrap::SystemReadiness),
     // ── Audit / Run replay messages ───────────────────────────────────────
     /// Load runs for the selected agent.
     AuditLoadRuns(String),
@@ -1012,6 +1023,21 @@ pub struct OpenClawApp {
     audit_events: Vec<AuditEventRecord>,
     /// Whether audit data is being loaded.
     audit_loading: bool,
+    // ── Agent execution state ─────────────────────────────────────────────
+    /// Task goal input buffer.
+    agent_task_goal_input: String,
+    /// Whether a task is currently running for the selected agent.
+    agent_task_running: bool,
+    /// Log of executor events for the current/last run.
+    agent_exec_log: Vec<openclaw_agent_executor::ExecutorEvent>,
+    /// Final answer from the last completed run.
+    agent_last_answer: Option<String>,
+    /// System readiness state for WasmEdge / OpenClaw JS / Node.js.
+    agent_readiness: Option<openclaw_agent_executor::bootstrap::SystemReadiness>,
+    /// Flume sender for streaming executor events into the UI subscription.
+    agent_exec_tx: Option<flume::Sender<openclaw_agent_executor::ExecutorEvent>>,
+    /// Flume receiver for the executor event subscription (wrapped for async clone).
+    agent_exec_rx: Option<std::sync::Arc<tokio::sync::Mutex<flume::Receiver<openclaw_agent_executor::ExecutorEvent>>>>,
     // ── Environment check state ───────────────────────────────────────────
     /// Whether the env-check overlay is currently visible.
     env_check_visible: bool,
@@ -1245,6 +1271,13 @@ impl cosmic::Application for OpenClawApp {
             agent_rename_input: String::new(),
             agent_editing_name: false,
             agent_loading: false,
+            agent_task_goal_input: String::new(),
+            agent_task_running: false,
+            agent_exec_log: Vec::new(),
+            agent_last_answer: None,
+            agent_readiness: None,
+            agent_exec_tx: None,
+            agent_exec_rx: None,
             audit_runs: Vec::new(),
             audit_run_selected: None,
             audit_steps: Vec::new(),
@@ -1927,6 +1960,92 @@ impl cosmic::Application for OpenClawApp {
                     }
                     self.agent_selected = None;
                 }
+            }
+            // ── Agent execution (AgentExecutor) handlers ──────────────────
+            AppMessage::AgentTaskGoalChanged(s) => {
+                self.agent_task_goal_input = s;
+            }
+            AppMessage::AgentReadinessChecked(r) => {
+                self.agent_readiness = Some(r);
+            }
+            AppMessage::AgentRunTask => {
+                let goal = self.agent_task_goal_input.trim().to_string();
+                if goal.is_empty() {
+                    return Task::none();
+                }
+                let agent = match self.agent_selected.and_then(|i| self.agent_list.get(i)) {
+                    Some(a) => a.clone(),
+                    None => return Task::none(),
+                };
+                if self.agent_task_running {
+                    return Task::none();
+                }
+                self.agent_task_running = true;
+                self.agent_exec_log.clear();
+                self.agent_last_answer = None;
+
+                let agent_id   = agent.id.to_string();
+                let agent_name = agent.display_name.clone();
+                let agent_role = agent.role.to_string();
+                let cap_ids: Vec<String> = agent.capabilities.iter().map(|c| c.id.clone()).collect();
+                let goal2 = goal.clone();
+
+                let cfg = openclaw_agent_executor::ExecutorConfig {
+                    llm_endpoint: self.config.openclaw_ai.endpoint.clone(),
+                    model:        self.config.openclaw_ai.model.clone(),
+                    api_key:      self.config.openclaw_ai.api_key.clone(),
+                    temperature:  self.config.openclaw_ai.temperature,
+                    max_tokens:   self.config.openclaw_ai.max_tokens,
+                    is_ollama:    matches!(self.config.openclaw_ai.provider, AiProvider::Ollama),
+                    gateway_port: 7878,
+                    max_steps:    20,
+                    timeout_secs: 300,
+                };
+
+                let (tx, rx) = flume::unbounded::<openclaw_agent_executor::ExecutorEvent>();
+                self.agent_exec_tx = Some(tx.clone());
+                self.agent_exec_rx = Some(std::sync::Arc::new(tokio::sync::Mutex::new(rx)));
+
+                return Task::perform(
+                    async move {
+                        let executor = openclaw_agent_executor::AgentExecutor::new(cfg);
+                        let mut handle = executor.run(agent_id, agent_name, agent_role, cap_ids, goal2);
+                        while let Some(ev) = handle.events.recv().await {
+                            if tx.send(ev).is_err() { break; }
+                        }
+                    },
+                    |()| cosmic::Action::App(AppMessage::Noop),
+                );
+            }
+            AppMessage::AgentExecutorEvent(ev) => {
+                use openclaw_agent_executor::ExecutorEvent;
+                match &ev {
+                    ExecutorEvent::RunFinished { answer, .. } => {
+                        self.agent_last_answer = Some(answer.clone());
+                        self.agent_task_running = false;
+                        // Refresh run count
+                        if let Some(idx) = self.agent_selected {
+                            if let Some(p) = self.agent_list.get_mut(idx) {
+                                p.stats.total_runs += 1;
+                                let _ = p.save();
+                            }
+                        }
+                    }
+                    ExecutorEvent::RunFailed { .. } => {
+                        self.agent_task_running = false;
+                    }
+                    _ => {}
+                }
+                self.agent_exec_log.push(ev);
+            }
+            AppMessage::AgentStopTask => {
+                self.agent_task_running = false;
+                self.agent_exec_log.push(
+                    openclaw_agent_executor::ExecutorEvent::Log {
+                        run_id: String::new(),
+                        message: "Task cancelled by user.".to_string(),
+                    }
+                );
             }
             // ── Audit / Run replay handlers ───────────────────────────────
             AppMessage::AuditLoadRuns(agent_id) => {
@@ -3815,6 +3934,7 @@ impl cosmic::Application for OpenClawApp {
                             openclaw_security::AgentRole::FinanceProcurement   => "财务采购员，处理付款审批和采购流程",
                             openclaw_security::AgentRole::NewsSecretary        => "新闻信息秘书，推送热点和重要提醒",
                             openclaw_security::AgentRole::SecurityCodeAuditor  => "安全代码审计员，执行 SAST 和 Git 提交监控",
+                            openclaw_security::AgentRole::IntelOfficer         => "全网情报员，抓取、分析和汇报互联网情报",
                             openclaw_security::AgentRole::Custom { label }     => label.as_str(),
                         };
                         let system_prompt = format!(
@@ -4514,6 +4634,28 @@ impl cosmic::Application for OpenClawApp {
         // Embedded mode: receive events directly from the flume channel.
         // SAFETY: We clone the inner Receiver out of the Mutex immediately so the
         // lock is not held across the async recv_async() await point, preventing deadlock.
+        // Executor event subscription: drain flume channel → AppMessage::AgentExecutorEvent
+        let maybe_exec_sub = self.agent_exec_rx.as_ref().map(|rx_arc| {
+            let rx_arc2 = rx_arc.clone();
+            Subscription::run_with_id(
+                "agent_executor_events",
+                cosmic::iced_futures::stream::channel(
+                    64,
+                    move |mut output| async move {
+                        let receiver = rx_arc2.lock().await.clone();
+                        loop {
+                            match receiver.recv_async().await {
+                                Ok(ev) => {
+                                    let _ = output.try_send(AppMessage::AgentExecutorEvent(ev));
+                                }
+                                Err(_) => break,
+                            }
+                        }
+                    },
+                ),
+            )
+        });
+
         if let Some(rx_arc) = &self.event_rx {
             let rx_arc = rx_arc.clone();
             let sandbox_sub = Subscription::run_with_id(
@@ -4521,8 +4663,6 @@ impl cosmic::Application for OpenClawApp {
                 cosmic::iced_futures::stream::channel(
                     100,
                     move |mut output| async move {
-                        // Clone the receiver once outside the loop to avoid
-                        // re-acquiring the lock on every iteration.
                         let receiver = rx_arc.lock().await.clone();
                         loop {
                             match receiver.recv_async().await {
@@ -4538,7 +4678,13 @@ impl cosmic::Application for OpenClawApp {
                     },
                 ),
             );
-            Subscription::batch([keyboard_sub, sandbox_sub])
+            if let Some(exec_sub) = maybe_exec_sub {
+                Subscription::batch([keyboard_sub, sandbox_sub, exec_sub])
+            } else {
+                Subscription::batch([keyboard_sub, sandbox_sub])
+            }
+        } else if let Some(exec_sub) = maybe_exec_sub {
+            Subscription::batch([keyboard_sub, exec_sub])
         } else {
             keyboard_sub
         }
@@ -5571,6 +5717,156 @@ impl OpenClawApp {
                             .padding([10, 24, 10, 24])
                     )
                     .push(widget::divider::horizontal::light())
+                    // ── task execution panel ──────────────────────────────
+                    .push({
+                        let c_run_accent = cosmic::iced::Color::from_rgb(0.20, 0.80, 0.50);
+                        let c_run_err    = cosmic::iced::Color::from_rgb(0.92, 0.28, 0.28);
+                        let is_running   = self.agent_task_running;
+
+                        let run_btn: Element<AppMessage> = if is_running {
+                            widget::button::destructive("⏹ 停止任务")
+                                .on_press(AppMessage::AgentStopTask)
+                                .into()
+                        } else {
+                            widget::button::suggested("▶ 运行任务")
+                                .on_press(AppMessage::AgentRunTask)
+                                .into()
+                        };
+
+                        // Execution log (last 8 events)
+                        let log_items: Vec<Element<AppMessage>> = self.agent_exec_log
+                            .iter()
+                            .rev()
+                            .take(8)
+                            .rev()
+                            .map(|ev| {
+                                use openclaw_agent_executor::ExecutorEvent;
+                                let (icon, text_str, color) = match ev {
+                                    ExecutorEvent::RunStarted { goal, .. } =>
+                                        ("🚀", format!("任务开始: {}", goal.chars().take(40).collect::<String>()), c_run_accent),
+                                    ExecutorEvent::Bootstrapping { .. } =>
+                                        ("⚙", "初始化工作空间…".into(), c_muted2),
+                                    ExecutorEvent::BootstrapDone { openclaw_available, quickjs_available, .. } =>
+                                        ("✓", format!("Bootstrap 完成 | OpenClaw={} | QuickJS={}", openclaw_available, quickjs_available), c_run_accent),
+                                    ExecutorEvent::SessionRegistered { session_id, .. } =>
+                                        ("🔑", format!("会话 {}", &session_id[..8.min(session_id.len())]), c_muted2),
+                                    ExecutorEvent::StepCompleted { step, skill_name, allowed, observation_snippet, elapsed_ms, .. } => {
+                                        let allow_str = if *allowed { "✓" } else { "✗" };
+                                        ("→", format!("Step {} {} {} ({}ms): {}", step+1, allow_str, skill_name, elapsed_ms, observation_snippet.chars().take(50).collect::<String>()), c_muted2)
+                                    },
+                                    ExecutorEvent::SkillDenied { skill_name, reason, .. } =>
+                                        ("🚫", format!("拒绝: {} — {}", skill_name, reason), c_run_err),
+                                    ExecutorEvent::RunFinished { answer, elapsed_secs, .. } =>
+                                        ("✅", format!("完成 ({}s): {}", elapsed_secs, answer.chars().take(60).collect::<String>()), c_run_accent),
+                                    ExecutorEvent::RunFailed { error_code, message, .. } =>
+                                        ("❌", format!("[{}] {}", error_code, message.chars().take(60).collect::<String>()), c_run_err),
+                                    ExecutorEvent::Log { message, .. } =>
+                                        ("·", message.chars().take(80).collect::<String>(), c_muted2),
+                                };
+                                Element::from(
+                                    widget::row()
+                                        .push(widget::text(icon).size(11))
+                                        .push(widget::text(text_str).size(11)
+                                            .class(cosmic::theme::Text::Color(color)))
+                                        .spacing(6)
+                                        .align_y(Alignment::Center)
+                                )
+                            })
+                            .collect();
+
+                        let log_col = if log_items.is_empty() {
+                            Element::from(
+                                widget::text("暂无运行记录 — 输入目标后点击「运行任务」").size(11)
+                                    .class(cosmic::theme::Text::Color(c_muted2))
+                            )
+                        } else {
+                            let mut col = widget::column().spacing(3);
+                            for item in log_items { col = col.push(item); }
+                            col.into()
+                        };
+
+                        let answer_el: Element<AppMessage> = if let Some(ans) = &self.agent_last_answer {
+                            widget::container(
+                                widget::column()
+                                    .push(widget::text("最终答案").size(11).font(cosmic::font::bold())
+                                        .class(cosmic::theme::Text::Color(c_run_accent)))
+                                    .push(widget::text(ans).size(12))
+                                    .spacing(4)
+                                    .padding([8, 10])
+                            )
+                            .style(move |_: &cosmic::Theme| ContainerStyle {
+                                background: Some(cosmic::iced::Background::Color(
+                                    cosmic::iced::Color::from_rgba(0.20, 0.80, 0.50, 0.08)
+                                )),
+                                border: cosmic::iced::Border {
+                                    color: cosmic::iced::Color::from_rgba(0.20, 0.80, 0.50, 0.35),
+                                    width: 1.0, radius: 6.0.into(),
+                                },
+                                ..Default::default()
+                            })
+                            .width(Length::Fill)
+                            .into()
+                        } else {
+                            widget::Space::new(0, 0).into()
+                        };
+
+                        widget::column()
+                            .push(
+                                widget::row()
+                                    .push(widget::text("任务执行").size(11).font(cosmic::font::bold())
+                                        .class(cosmic::theme::Text::Color(c_muted2)))
+                                    .push(widget::horizontal_space().width(Length::Fill))
+                                    .push({
+                                        let el: Element<AppMessage> = if is_running {
+                                            widget::text("● 运行中…").size(11)
+                                                .class(cosmic::theme::Text::Color(c_run_accent))
+                                                .into()
+                                        } else {
+                                            widget::Space::new(0u16, 0u16).into()
+                                        };
+                                        el
+                                    })
+                                    .align_y(Alignment::Center)
+                            )
+                            .push(
+                                widget::row()
+                                    .push(
+                                        widget::text_input("输入任务目标（例：帮我抓取 Hacker News 今日热榜）", &self.agent_task_goal_input)
+                                            .on_input(AppMessage::AgentTaskGoalChanged)
+                                            .padding([6, 10])
+                                            .width(Length::Fill)
+                                    )
+                                    .push(run_btn)
+                                    .spacing(8)
+                                    .align_y(Alignment::Center)
+                            )
+                            .push(
+                                widget::container(
+                                    widget::scrollable(
+                                        widget::column()
+                                            .push(log_col)
+                                            .spacing(2)
+                                            .padding([6, 8])
+                                    )
+                                )
+                                .style(|theme: &cosmic::Theme| {
+                                    let bg = theme.cosmic().bg_color();
+                                    ContainerStyle {
+                                        background: Some(cosmic::iced::Background::Color(
+                                            cosmic::iced::Color::from_rgb((bg.red*0.80).min(1.0),(bg.green*0.80).min(1.0),(bg.blue*0.80).min(1.0))
+                                        )),
+                                        border: cosmic::iced::Border { radius: 4.0.into(), ..Default::default() },
+                                        ..Default::default()
+                                    }
+                                })
+                                .width(Length::Fill)
+                                .height(Length::Fixed(140.0))
+                            )
+                            .push(answer_el)
+                            .spacing(8)
+                            .padding([10, 24, 10, 24])
+                    })
+                    .push(widget::divider::horizontal::light())
                     .push(widget::container(actions).padding([12, 0]))
                     .spacing(0);
 
@@ -6388,6 +6684,7 @@ impl OpenClawApp {
             AgentRole::FinanceProcurement   => cosmic::iced::Color::from_rgb(0.72, 0.62, 0.12),
             AgentRole::NewsSecretary        => cosmic::iced::Color::from_rgb(0.48, 0.32, 0.72),
             AgentRole::SecurityCodeAuditor  => cosmic::iced::Color::from_rgb(0.82, 0.38, 0.22),
+            AgentRole::IntelOfficer         => cosmic::iced::Color::from_rgb(0.18, 0.72, 0.62),
             AgentRole::Custom { .. }        => cosmic::iced::Color::from_rgb(0.45, 0.45, 0.45),
         }
     }
