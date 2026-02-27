@@ -26,3 +26,8 @@ openclaw-storage = { path = "../storage" }
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = "3.8"
+axum = { version = "0.7", default-features = false, features = [
+    "json",
+    "tokio",
+    "http1",
+] }
