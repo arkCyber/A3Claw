@@ -248,9 +248,17 @@ async fn run_task(
         session_id: session_id.clone(),
     }).await;
 
-    // Notify gateway that agent session started
+    // Notify gateway: session started + register capability profile
     let gw_url = format!("http://localhost:{}", config.gateway_port);
     notify_gateway_start(&gw_url, &session_id, &agent_name).await;
+    notify_gateway_session_register(
+        &gw_url,
+        &session_id,
+        &agent_id,
+        &agent_name,
+        &agent_role,
+        &capability_ids,
+    ).await;
 
     // ── 3. Build skill set ────────────────────────────────────────────────────
     let skill_set = if capability_ids.is_empty() {
@@ -288,9 +296,6 @@ async fn run_task(
     let dispatcher = SkillDispatcher::new(&gw_url);
 
     // ── 6. Run ReAct loop with step event forwarding ──────────────────────────
-    let prev_steps = std::sync::Arc::new(tokio::sync::Mutex::new(0u32));
-
-    // We run the loop, polling for new steps and forwarding events
     let loop_result = run_react_loop(&mut ctx, &skill_set, &llm, &dispatcher, &session_id).await;
 
     // Forward all completed steps as events
@@ -303,7 +308,6 @@ async fn run_task(
             observation_snippet: step.observation.chars().take(120).collect(),
             elapsed_ms: step.elapsed_ms,
         }).await;
-        let _ = prev_steps.lock().await;
     }
 
     // ── 7. Finalise ───────────────────────────────────────────────────────────
@@ -342,6 +346,28 @@ async fn notify_gateway_start(gw_url: &str, session_id: &str, agent_name: &str) 
             "sessionId": session_id,
             "agentName": agent_name,
             "timestamp": iso_now()
+        }))
+        .send()
+        .await;
+}
+
+async fn notify_gateway_session_register(
+    gw_url: &str,
+    session_id: &str,
+    agent_id: &str,
+    agent_name: &str,
+    agent_role: &str,
+    capability_ids: &[String],
+) {
+    let client = reqwest::Client::new();
+    let _ = client
+        .post(format!("{}/hooks/session-register", gw_url))
+        .json(&serde_json::json!({
+            "sessionId":           session_id,
+            "agentId":             agent_id,
+            "agentName":           agent_name,
+            "agentRole":           agent_role,
+            "allowedCapabilities": capability_ids,
         }))
         .send()
         .await;

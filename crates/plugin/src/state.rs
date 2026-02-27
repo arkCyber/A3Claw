@@ -7,6 +7,7 @@
 use crate::skill_registry::SkillRegistry;
 use openclaw_security::{BreakerStats, SandboxEvent, SecurityConfig};
 use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -15,6 +16,22 @@ use tracing::warn;
 
 /// Maximum number of events kept in the in-memory ring buffer.
 const MAX_EVENTS: usize = 500;
+
+/// Per-session agent profile registered by the executor at task start.
+/// Carries the capability whitelist so `before_skill` can enforce per-agent policy.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionProfile {
+    /// Agent UUID (matches AgentProfile::id).
+    pub agent_id: String,
+    /// Human-readable display name.
+    pub agent_name: String,
+    /// Role string (e.g. "IntelOfficer").
+    pub agent_role: String,
+    /// Capability IDs the agent is allowed to use (e.g. ["web.fetch", "shell.read"]).
+    pub allowed_capabilities: Vec<String>,
+    /// Unix timestamp when the session was registered.
+    pub registered_at: u64,
+}
 
 /// Live statistics snapshot returned by `/skills/status`.
 #[derive(Debug, Clone, Default)]
@@ -57,6 +74,9 @@ pub struct GatewayState {
     // ── Active session IDs ────────────────────────────────────────────────────
     active_sessions: RwLock<HashSet<String>>,
 
+    // ── Per-session AgentProfile metadata (session_id → SessionProfile) ──────
+    session_profiles: RwLock<HashMap<String, SessionProfile>>,
+
     // ── Event ID counter ─────────────────────────────────────────────────────
     next_event_id: AtomicU64,
 
@@ -81,6 +101,7 @@ impl GatewayState {
             total_denials:         AtomicU64::new(0),
             ready:                 AtomicBool::new(false),
             active_sessions:       RwLock::new(HashSet::new()),
+            session_profiles:      RwLock::new(HashMap::new()),
             next_event_id:         AtomicU64::new(1),
             pending_confirmations: RwLock::new(HashMap::new()),
         })
@@ -251,6 +272,37 @@ impl GatewayState {
 
     pub fn on_agent_stop(&self, session_id: &str) {
         self.active_sessions.write().remove(session_id);
+        self.session_profiles.write().remove(session_id);
+    }
+
+    // ── Per-session AgentProfile routing ──────────────────────────────────────
+
+    /// Register or update the AgentProfile for an active session.
+    pub fn register_session_profile(&self, session_id: impl Into<String>, profile: SessionProfile) {
+        self.session_profiles.write().insert(session_id.into(), profile);
+    }
+
+    /// Look up the AgentProfile for a session.
+    pub fn session_profile(&self, session_id: &str) -> Option<SessionProfile> {
+        self.session_profiles.read().get(session_id).cloned()
+    }
+
+    /// Returns `true` if `skill_name` is in the session's capability whitelist.
+    /// If no profile is registered for the session, the check passes (default-allow).
+    pub fn is_skill_allowed_for_session(&self, session_id: &str, skill_name: &str) -> bool {
+        match self.session_profiles.read().get(session_id) {
+            None => true, // no profile → default-allow (backward-compat)
+            Some(profile) => {
+                if profile.allowed_capabilities.is_empty() {
+                    return true; // empty list → allow all
+                }
+                profile.allowed_capabilities.iter().any(|cap| {
+                    cap == skill_name
+                        || skill_name.starts_with(&format!("{cap}."))
+                        || cap.ends_with('*') && skill_name.starts_with(&cap[..cap.len()-1])
+                })
+            }
+        }
     }
 
     // ── Policy hot-reload ─────────────────────────────────────────────────────

@@ -15,7 +15,7 @@
 //! - `POST  /skills/deny/:id`      — deny a pending confirmation by event ID
 
 use crate::skill_registry::RiskLevel;
-use crate::state::GatewayState;
+use crate::state::{GatewayState, SessionProfile};
 use crate::types::{
     AckResponse, AfterSkillPayload, AgentStartPayload, AgentStopPayload, BeforeSkillPayload,
     BeforeSkillResponse, PolicyUpdateRequest, PolicyUpdateResponse, StatusResponse,
@@ -39,11 +39,13 @@ pub fn build_router(state: Arc<GatewayState>) -> Router {
         .route("/health", get(health))
         .route("/ready",  get(ready))
         // OpenClaw plugin hooks
-        .route("/hooks/before-skill", post(before_skill))
-        .route("/hooks/after-skill",  post(after_skill))
-        .route("/hooks/agent-start",  post(agent_start))
-        .route("/hooks/agent-stop",   post(agent_stop))
-        .route("/hooks/confirm",      post(hook_confirm))
+        .route("/hooks/before-skill",       post(before_skill))
+        .route("/hooks/after-skill",        post(after_skill))
+        .route("/hooks/agent-start",        post(agent_start))
+        .route("/hooks/agent-stop",         post(agent_stop))
+        .route("/hooks/confirm",            post(hook_confirm))
+        .route("/hooks/session-register",   post(session_register))
+        .route("/hooks/session-deregister", post(session_deregister))
         // Skills exposed by this plugin
         .route("/skills/status",      get(skill_status))
         .route("/skills/events",      get(skill_events))
@@ -100,6 +102,24 @@ async fn before_skill(
     // regardless of the verdict.
     let event = skill_to_sandbox_event(&payload);
     state.record_event(event);
+
+    // ── Per-session capability filter ─────────────────────────────────────────
+    // Deny the skill if the session's AgentProfile does not include this capability.
+    if !state.is_skill_allowed_for_session(&payload.session_id, &payload.skill_name) {
+        warn!(
+            skill   = %payload.skill_name,
+            session = %payload.session_id,
+            "Skill blocked: not in session capability list"
+        );
+        state.increment_denied();
+        return (
+            StatusCode::OK,
+            Json(BeforeSkillResponse::deny(format!(
+                "[OpenClaw+] Skill '{}' is not in this agent's allowed capabilities.",
+                payload.skill_name
+            ))),
+        );
+    }
 
     let response = match risk {
         RiskLevel::Deny => {
@@ -171,6 +191,65 @@ async fn agent_start(
 ) -> impl IntoResponse {
     info!(session = %payload.session_id, "Agent session started");
     state.on_agent_start(&payload.session_id);
+    (StatusCode::OK, Json(AckResponse::ok()))
+}
+
+// ── Hook: session-register ────────────────────────────────────────────────────
+
+/// Payload for `POST /hooks/session-register`.
+/// Sent by the executor right after acquiring a session ID so the gateway
+/// can enforce per-agent capability policy on subsequent skill calls.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionRegisterPayload {
+    session_id:           String,
+    agent_id:             String,
+    agent_name:           String,
+    agent_role:           String,
+    allowed_capabilities: Vec<String>,
+}
+
+async fn session_register(
+    State(state): State<Arc<GatewayState>>,
+    Json(p): Json<SessionRegisterPayload>,
+) -> impl IntoResponse {
+    info!(
+        session = %p.session_id,
+        agent   = %p.agent_id,
+        caps    = p.allowed_capabilities.len(),
+        "Session profile registered"
+    );
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    state.register_session_profile(
+        p.session_id,
+        SessionProfile {
+            agent_id:             p.agent_id,
+            agent_name:           p.agent_name,
+            agent_role:           p.agent_role,
+            allowed_capabilities: p.allowed_capabilities,
+            registered_at:        now,
+        },
+    );
+    (StatusCode::OK, Json(AckResponse::ok()))
+}
+
+// ── Hook: session-deregister ──────────────────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionDeregisterPayload {
+    session_id: String,
+}
+
+async fn session_deregister(
+    State(state): State<Arc<GatewayState>>,
+    Json(p): Json<SessionDeregisterPayload>,
+) -> impl IntoResponse {
+    info!(session = %p.session_id, "Session profile deregistered");
+    state.on_agent_stop(&p.session_id);
     (StatusCode::OK, Json(AckResponse::ok()))
 }
 
