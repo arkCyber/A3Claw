@@ -1,4 +1,5 @@
 mod app;
+mod env_check;
 mod i18n;
 mod icons;
 mod ipc_client;

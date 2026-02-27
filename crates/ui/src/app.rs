@@ -525,6 +525,15 @@ pub enum AppMessage {
     ShowLanguageMenu,
     /// Hide the language selection popup menu.
     HideLanguageMenu,
+    // ── Environment check messages ─────────────────────────────────────────
+    /// Startup: run full environment health check.
+    EnvCheckStart,
+    /// One environment check step completed.
+    EnvCheckStepDone(crate::env_check::EnvCheckStepResult),
+    /// All environment checks completed (batch result).
+    EnvCheckAllDone(Vec<crate::env_check::EnvCheckStepResult>),
+    /// User dismissed the env-check overlay (enter app).
+    EnvCheckDismiss,
 }
 
 /// Quick-action preset commands available in the Claw Terminal.
@@ -1003,6 +1012,11 @@ pub struct OpenClawApp {
     audit_events: Vec<AuditEventRecord>,
     /// Whether audit data is being loaded.
     audit_loading: bool,
+    // ── Environment check state ───────────────────────────────────────────
+    /// Whether the env-check overlay is currently visible.
+    env_check_visible: bool,
+    /// Accumulated environment check report.
+    env_check_report: crate::env_check::EnvCheckReport,
 }
 
 /// Aggregate statistics derived from sandbox events, displayed on the dashboard.
@@ -1052,6 +1066,10 @@ impl cosmic::Application for OpenClawApp {
 
     fn init(core: Core, _flags: Self::Flags) -> (Self, Task<Self::Message>) {
         let config = SecurityConfig::load_or_default();
+        let ai_init_endpoint = config.openclaw_ai.endpoint.clone();
+        let ai_init_model    = config.openclaw_ai.model.clone();
+        eprintln!("[INIT] config loaded: endpoint={} model={} provider={:?}",
+            ai_init_endpoint, ai_init_model, config.openclaw_ai.provider);
 
         // Create the event and control channels.
         let (event_tx, event_rx) = flume::unbounded::<SandboxEvent>();
@@ -1155,7 +1173,12 @@ impl cosmic::Application for OpenClawApp {
             breaker_stats: BreakerStats::default(),
             circuit_breaker: Some(breaker_arc),
             run_mode,
-            ai_chat: AiChatState::default(),
+            ai_chat: {
+                let mut s = AiChatState::default();
+                if !ai_init_endpoint.is_empty() { s.endpoint   = ai_init_endpoint; }
+                if !ai_init_model.is_empty()    { s.model_name = ai_init_model; }
+                s
+            },
             inference_engine: None,
             show_about: false,
             language: Language::default(),
@@ -1227,14 +1250,16 @@ impl cosmic::Application for OpenClawApp {
             audit_steps: Vec::new(),
             audit_events: Vec::new(),
             audit_loading: false,
+            env_check_visible: true,
+            env_check_report: crate::env_check::EnvCheckReport::new(),
         };
         app.core.window.header_title = "OpenClawPlus - AI Agent Platform".into();
 
-        // Startup sequence: check environment → init AI → start sandbox
+        // Startup sequence: env health check overlay → then init AI → start sandbox
         let startup_task = Task::perform(
             async {
-                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                AppMessage::StartupCheckEnvironment
+                tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+                AppMessage::EnvCheckStart
             },
             cosmic::Action::App,
         );
@@ -1419,6 +1444,11 @@ impl cosmic::Application for OpenClawApp {
     }
 
     fn view(&self) -> Element<Self::Message> {
+        // ── Env check overlay (shown on first startup until dismissed) ─────
+        if self.env_check_visible {
+            return crate::pages::env_check_page::EnvCheckPage::view(&self.env_check_report);
+        }
+
         if self.show_about {
             return self.view_about();
         }
@@ -2001,6 +2031,7 @@ impl cosmic::Application for OpenClawApp {
                 self.config.confirm_network = !self.config.confirm_network;
             }
             AppMessage::AiEndpointChanged(url) => {
+                eprintln!("[AI-CONFIG] AiEndpointChanged: {} -> {}", self.ai_chat.endpoint, url);
                 self.ai_chat.endpoint = url;
                 self.inference_engine = None;
             }
@@ -2008,6 +2039,75 @@ impl cosmic::Application for OpenClawApp {
                 if let Ok(mb) = s.parse::<u32>() {
                     self.config.memory_limit_mb = mb;
                 }
+            }
+            // ── Environment check ─────────────────────────────────────────────────
+            AppMessage::EnvCheckStart => {
+                eprintln!("[ENV-CHECK] Starting environment health check");
+                self.env_check_visible = true;
+                self.env_check_report = crate::env_check::EnvCheckReport::new();
+                // Mark all items as Running so the UI shows progress immediately
+                for item in &mut self.env_check_report.items {
+                    item.status = crate::env_check::CheckStatus::Pending;
+                }
+                let params = crate::env_check::EnvCheckParams {
+                    ollama_endpoint: self.ai_chat.endpoint.clone(),
+                    ollama_model:    self.ai_chat.model_name.clone(),
+                    openai_api_key:  {
+                        let k = self.config.openclaw_ai.api_key.clone();
+                        if k.is_empty() { None } else { Some(k) }
+                    },
+                    deepseek_api_key: None,
+                    anthropic_api_key: None,
+                    gateway_url:     self.gateway_url.clone(),
+                    workspace_dir:   self.config.workspace_dir.to_string_lossy().to_string(),
+                };
+                return Task::perform(
+                    async move {
+                        crate::env_check::run_all_checks(params).await
+                    },
+                    |results| cosmic::Action::App(AppMessage::EnvCheckAllDone(results)),
+                );
+            }
+            AppMessage::EnvCheckStepDone(step) => {
+                eprintln!("[ENV-CHECK] step={} status={:?}", step.id, step.status);
+                if let Some(item) = self.env_check_report.get_mut(step.id) {
+                    item.status = step.status;
+                    item.latency_ms = step.latency_ms;
+                    if let Some(d) = step.detail {
+                        item.detail = Some(d);
+                    }
+                }
+                if step.ollama_started {
+                    self.env_check_report.ollama_was_started = true;
+                }
+            }
+            AppMessage::EnvCheckAllDone(results) => {
+                eprintln!("[ENV-CHECK] All {} checks complete", results.len());
+                for step in results {
+                    if let Some(item) = self.env_check_report.get_mut(step.id) {
+                        item.status = step.status;
+                        item.latency_ms = step.latency_ms;
+                        if let Some(d) = step.detail {
+                            item.detail = Some(d);
+                        }
+                    }
+                    if step.ollama_started {
+                        self.env_check_report.ollama_was_started = true;
+                        // Sync the endpoint into ai_chat if Ollama was auto-started on localhost
+                        if self.ai_chat.endpoint.contains("localhost") {
+                            eprintln!("[ENV-CHECK] Ollama auto-started, endpoint confirmed: {}", self.ai_chat.endpoint);
+                        }
+                    }
+                }
+                self.env_check_report.all_critical_ok = self.env_check_report.items.iter()
+                    .filter(|i| matches!(i.id, "ollama_running" | "disk_space"))
+                    .all(|i| i.status.is_ok() || matches!(i.status, crate::env_check::CheckStatus::Warning(_)));
+            }
+            AppMessage::EnvCheckDismiss => {
+                eprintln!("[ENV-CHECK] Dismissed, proceeding to normal startup");
+                self.env_check_visible = false;
+                // Continue original startup sequence
+                return self.update(AppMessage::StartupCheckEnvironment);
             }
             // ── Startup sequence ──────────────────────────────────────────────────
             AppMessage::StartupCheckEnvironment => {
@@ -3757,14 +3857,37 @@ impl cosmic::Application for OpenClawApp {
                         });
 
                         // Always create a fresh InferenceEngine for each agent call.
-                        // This avoids the cached circuit breaker accumulating failures
-                        // across sessions and permanently blocking the agent.
-                        let ai_cfg = &self.config.openclaw_ai;
+                        // Prefer ai_chat.endpoint/model_name (set via Settings UI) over
+                        // config.openclaw_ai which may lag behind.
+                        let endpoint = if !self.ai_chat.endpoint.is_empty() {
+                            self.ai_chat.endpoint.clone()
+                        } else {
+                            self.config.openclaw_ai.endpoint.clone()
+                        };
+                        let model = if !self.ai_chat.model_name.is_empty() {
+                            self.ai_chat.model_name.clone()
+                        } else {
+                            self.config.openclaw_ai.model.clone()
+                        };
+                        let api_key = if !self.config.openclaw_ai.api_key.is_empty() {
+                            Some(self.config.openclaw_ai.api_key.clone())
+                        } else {
+                            None
+                        };
+                        // Derive backend kind from endpoint URL
+                        let backend = if endpoint.contains("localhost:11434") || endpoint.contains("ollama") {
+                            openclaw_inference::types::BackendKind::Ollama
+                        } else if endpoint.contains("openai.com") {
+                            openclaw_inference::types::BackendKind::OpenAiCompat
+                        } else {
+                            provider_to_backend_kind(&self.config.openclaw_ai.provider)
+                        };
+                        eprintln!("[CLAW-AGENT] resolved: endpoint={} model={} backend={:?}", endpoint, model, backend);
                         let cfg = InferenceConfig {
-                            backend: provider_to_backend_kind(&ai_cfg.provider),
-                            endpoint: ai_cfg.endpoint.clone(),
-                            model_name: ai_cfg.model.clone(),
-                            api_key: if ai_cfg.api_key.is_empty() { None } else { Some(ai_cfg.api_key.clone()) },
+                            backend,
+                            endpoint,
+                            model_name: model,
+                            api_key,
                             circuit_breaker_threshold: 999,
                             circuit_breaker_reset: std::time::Duration::from_secs(1),
                             inference_timeout: std::time::Duration::from_secs(120),
