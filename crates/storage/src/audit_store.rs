@@ -154,7 +154,7 @@ impl<'db> AuditStore<'db> {
                 event_kind:  r.get(4)?,
                 target:      r.get(5)?,
                 input_hash:  r.get(6)?,
-                decision:    AuditDecision::from_str(&r.get::<_, String>(7)?),
+                decision:    AuditDecision::from_string(&r.get::<_, String>(7)?),
                 actor:       r.get(8)?,
                 reason:      r.get(9)?,
                 ts:          r.get::<_, i64>(10)? as u64,

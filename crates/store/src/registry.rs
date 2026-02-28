@@ -307,7 +307,7 @@ impl RegistryClient {
                 let name = entry.file_name().to_string_lossy().into_owned();
                 if name.ends_with(".wasm") {
                     // Strip the `-<version>.wasm` suffix to recover the plugin ID.
-                    if let Some(id) = name.rsplitn(2, '-').nth(1) {
+                    if let Some((id, _)) = name.rsplit_once('-') {
                         ids.push(id.to_string());
                     }
                 }

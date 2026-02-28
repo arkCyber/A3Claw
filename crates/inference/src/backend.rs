@@ -169,8 +169,7 @@ impl HttpBackend {
                 if line.is_empty() { continue; }
 
                 // OpenAI SSE: "data: {...}" or "data: [DONE]"
-                let json_str = if line.starts_with("data: ") {
-                    let payload = &line["data: ".len()..];
+                let json_str = if let Some(payload) = line.strip_prefix("data: ") {
                     if payload == "[DONE]" {
                         let _ = tx.send(StreamToken {
                             request_id, delta: String::new(), done: true,
@@ -197,10 +196,8 @@ impl HttpBackend {
                 let done = json["done"].as_bool().unwrap_or(false)
                     || json["choices"][0]["finish_reason"].as_str() == Some("stop");
 
-                if !delta.is_empty() || done {
-                    if tx.send(StreamToken { request_id, delta, done }).await.is_err() {
-                        break;
-                    }
+                if (!delta.is_empty() || done) && tx.send(StreamToken { request_id, delta, done }).await.is_err() {
+                    break;
                 }
                 if done { return Ok(()); }
             }

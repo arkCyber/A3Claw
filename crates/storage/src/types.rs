@@ -47,7 +47,7 @@ impl RunStatus {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_string(s: &str) -> Self {
         match s {
             "running"          => RunStatus::Running,
             "success"          => RunStatus::Success,
@@ -153,7 +153,7 @@ impl StepKind {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_string(s: &str) -> Self {
         match s {
             "inference"       => StepKind::Inference,
             "tool_call"       => StepKind::ToolCall,
@@ -268,7 +268,7 @@ impl AuditDecision {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_string(s: &str) -> Self {
         match s {
             "auto_allowed"   => AuditDecision::AutoAllowed,
             "human_approved" => AuditDecision::HumanApproved,

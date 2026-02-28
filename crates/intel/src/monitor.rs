@@ -1,6 +1,5 @@
 //! 竞品站点变化追踪 — 对比上次抓取内容，检测更新
 
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 /// 一个需要追踪的目标站点配置
@@ -121,7 +120,7 @@ pub async fn check_target(target: &mut MonitorTarget) -> MonitorResult {
 }
 
 /// 批量检查一组目标，并发执行
-pub async fn check_all(targets: &mut Vec<MonitorTarget>) -> Vec<MonitorResult> {
+pub async fn check_all(targets: &mut [MonitorTarget]) -> Vec<MonitorResult> {
     let mut results = Vec::new();
     for target in targets.iter_mut() {
         let r = check_target(target).await;

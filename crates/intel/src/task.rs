@@ -5,7 +5,6 @@
 //! - `ScanUrl`   — 临时抓取单个 URL 并摘要
 //! - `RssScan`   — 抓取单个 RSS feed
 
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use crate::monitor::MonitorTarget;
@@ -115,7 +114,7 @@ fn category_from_tags(tags: &[String]) -> IntelCategory {
 
 /// 执行 ScanAll 任务：检查所有目标，返回情报报告（不含 AI 摘要，摘要异步填充）
 pub async fn run_scan_all(
-    targets: &mut Vec<MonitorTarget>,
+    targets: &mut [MonitorTarget],
     sum_cfg: &SummarizeConfig,
     agent_id: &str,
     with_ai_summary: bool,

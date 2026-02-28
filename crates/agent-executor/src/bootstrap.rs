@@ -6,7 +6,7 @@
 
 use crate::error::ExecutorError;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tracing::{info, warn};
 
 // ── Bootstrap config ──────────────────────────────────────────────────────────
@@ -307,10 +307,9 @@ globalThis.fetch = async function(url, opts) {{
   return _origFetch(url, opts);
 }};
 
-console.log('[OpenClaw+] Security Shim active — Gateway: {gateway}');
+console.log('[OpenClaw+] Security Shim active — Gateway: http://localhost:{port}');
 "#,
         port = gateway_port,
-        gateway = format!("http://localhost:{}", gateway_port),
     )
 }
 

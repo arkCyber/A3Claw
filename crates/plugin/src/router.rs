@@ -70,10 +70,39 @@ async fn ready(State(state): State<Arc<GatewayState>>) -> impl IntoResponse {
 
 // ── Hook: before-skill ────────────────────────────────────────────────────────
 
+/// Validate that a skill name contains only safe characters (alphanumeric, `.`, `-`, `_`).
+/// Max length 128 characters.
+fn validate_skill_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 128
+        && name.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-' || c == '_')
+}
+
+/// Validate that a session ID is non-empty and bounded (max 256 chars).
+fn validate_session_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 256
+}
+
 async fn before_skill(
     State(state): State<Arc<GatewayState>>,
     Json(payload): Json<BeforeSkillPayload>,
 ) -> impl IntoResponse {
+    // ── Input validation ──────────────────────────────────────────────────────
+    if !validate_skill_name(&payload.skill_name) {
+        warn!(skill = %payload.skill_name, "before-skill rejected: invalid skill_name");
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(BeforeSkillResponse::deny("[OpenClaw+] Invalid skill name.")),
+        );
+    }
+    if !validate_session_id(&payload.session_id) {
+        warn!(session = %payload.session_id, "before-skill rejected: invalid session_id");
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(BeforeSkillResponse::deny("[OpenClaw+] Invalid session ID.")),
+        );
+    }
+
     info!(
         skill      = %payload.skill_name,
         session    = %payload.session_id,
@@ -427,6 +456,6 @@ fn skill_to_sandbox_event(payload: &BeforeSkillPayload) -> SandboxEvent {
         kind,
         ResourceKind::File,
         path,
-        &format!("skill:{}", payload.skill_name),
+        format!("skill:{}", payload.skill_name).to_owned(),
     )
 }

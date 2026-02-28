@@ -357,7 +357,7 @@ impl SkillDispatcher {
                         reason: "missing 'path' argument".into(),
                     })?;
                 let content = std::fs::read_to_string(path)
-                    .map_err(|e| ExecutorError::IoError(e))?;
+                    .map_err(ExecutorError::IoError)?;
                 let truncated: String = content.chars().take(3000).collect();
                 Ok(truncated)
             }
@@ -369,7 +369,7 @@ impl SkillDispatcher {
                         reason: "missing 'path' argument".into(),
                     })?;
                 let entries: Vec<String> = std::fs::read_dir(path)
-                    .map_err(|e| ExecutorError::IoError(e))?
+                    .map_err(ExecutorError::IoError)?
                     .flatten()
                     .map(|e| e.file_name().to_string_lossy().to_string())
                     .collect();
@@ -384,7 +384,7 @@ impl SkillDispatcher {
             "fs.stat" => {
                 let path = args["path"].as_str().unwrap_or("");
                 let meta = std::fs::metadata(path)
-                    .map_err(|e| ExecutorError::IoError(e))?;
+                    .map_err(ExecutorError::IoError)?;
                 Ok(format!(
                     "size: {} bytes, is_dir: {}, is_file: {}",
                     meta.len(), meta.is_dir(), meta.is_file()
@@ -398,7 +398,7 @@ impl SkillDispatcher {
                         reason: "missing 'path'".into(),
                     })?;
                 let content = args["content"].as_str().unwrap_or("");
-                std::fs::write(path, content).map_err(|e| ExecutorError::IoError(e))?;
+                std::fs::write(path, content).map_err(ExecutorError::IoError)?;
                 Ok(format!("Written {} bytes to {}", content.len(), path))
             }
 
@@ -408,7 +408,7 @@ impl SkillDispatcher {
                         skill: skill_name.into(),
                         reason: "missing 'path'".into(),
                     })?;
-                std::fs::create_dir_all(path).map_err(|e| ExecutorError::IoError(e))?;
+                std::fs::create_dir_all(path).map_err(ExecutorError::IoError)?;
                 Ok(format!("Directory created: {}", path))
             }
 

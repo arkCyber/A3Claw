@@ -283,6 +283,7 @@ impl GatewayState {
     }
 
     /// Look up the AgentProfile for a session.
+    #[allow(dead_code)]
     pub fn session_profile(&self, session_id: &str) -> Option<SessionProfile> {
         self.session_profiles.read().get(session_id).cloned()
     }

@@ -24,7 +24,7 @@ pub struct AgentId(pub String);
 
 impl AgentId {
     pub fn new() -> Self { Self(uuid_v4()) }
-    pub fn from_str(s: impl Into<String>) -> Self { Self(s.into()) }
+    pub fn from_string(s: impl Into<String>) -> Self { Self(s.into()) }
     pub fn as_str(&self) -> &str { &self.0 }
 }
 
@@ -59,18 +59,15 @@ fn uuid_v4() -> String {
 
 // ── AgentStatus ───────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentStatus {
+    #[default]
     Active,
     Suspended,
     Archived,
     Running,
     Faulted { reason: String },
-}
-
-impl Default for AgentStatus {
-    fn default() -> Self { AgentStatus::Active }
 }
 
 impl std::fmt::Display for AgentStatus {

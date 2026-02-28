@@ -83,8 +83,7 @@ fn parse_json_str<'a>(json: &'a str, key: &str) -> Option<&'a str> {
     let after = &json[pos + needle.len()..];
     let colon = after.find(':')? + 1;
     let v = after[colon..].trim_start();
-    if v.starts_with('"') {
-        let inner = &v[1..];
+    if let Some(inner) = v.strip_prefix('"') {
         let end = inner.find('"')?;
         Some(&inner[..end])
     } else {

@@ -429,9 +429,10 @@ pub struct PluginEntry {
 // ── Install state ─────────────────────────────────────────────────────────────
 
 /// Lifecycle state of a plugin installation.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum InstallState {
     /// Not yet started.
+    #[default]
     Idle,
     /// Fetching the `.wasm` from the registry.
     Downloading { progress: f32 },
@@ -443,12 +444,6 @@ pub enum InstallState {
     Installed,
     /// Installation failed; inner string is the human-readable reason.
     Failed(String),
-}
-
-impl Default for InstallState {
-    fn default() -> Self {
-        Self::Idle
-    }
 }
 
 // ── Store user preferences ────────────────────────────────────────────────────

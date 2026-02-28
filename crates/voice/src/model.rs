@@ -1,6 +1,6 @@
 //! Whisper GGML model management: check existence and download from Hugging Face.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// Default model name — "base" is small (142 MB) and works well for Chinese + English.
 pub const DEFAULT_MODEL_NAME: &str = "ggml-base.bin";

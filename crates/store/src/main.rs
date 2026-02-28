@@ -10,6 +10,7 @@
 //!    - macOS  : `~/Library/Logs/OpenClawStore/`
 //!    - Linux  : `~/.local/share/openclaw-store/logs/`
 //!    - Windows: `%APPDATA%\OpenClawStore\logs\`
+//!
 //!    The log level is controlled by the `RUST_LOG` environment variable;
 //!    defaults to `openclaw_store=info,warn`.
 //!

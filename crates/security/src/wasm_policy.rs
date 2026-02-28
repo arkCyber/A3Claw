@@ -266,7 +266,7 @@ impl WasmPolicyWatcher {
         // Initial load
         match WasmPolicyModule::load(&path) {
             Ok(m) => {
-                *module.write().unwrap() = Some(m);
+                *module.write().unwrap_or_else(|p| p.into_inner()) = Some(m);
                 info!(path = %path.display(), "[WasmPolicy] Initial load successful");
             }
             Err(e) => {
@@ -303,7 +303,7 @@ impl WasmPolicyWatcher {
 
                 let last_mtime = self.module
                     .read()
-                    .unwrap()
+                    .unwrap_or_else(|p| p.into_inner())
                     .as_ref()
                     .map(|m| m.mtime)
                     .unwrap_or(SystemTime::UNIX_EPOCH);
@@ -312,7 +312,7 @@ impl WasmPolicyWatcher {
                     info!(path = %self.path.display(), "[WasmPolicy] Change detected — reloading");
                     match WasmPolicyModule::load(&self.path) {
                         Ok(new_module) => {
-                            *self.module.write().unwrap() = Some(new_module);
+                            *self.module.write().unwrap_or_else(|p| p.into_inner()) = Some(new_module);
                             info!("[WasmPolicy] Hot-reload successful");
                         }
                         Err(e) => {

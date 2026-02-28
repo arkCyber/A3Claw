@@ -118,10 +118,11 @@ impl AgentKind {
 // ── OpenClaw AI Model Configuration ──────────────────────────────────────────
 
 /// Which AI provider / backend OpenClaw should use.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum AiProvider {
     /// Ollama local server (default, privacy-first).
+    #[default]
     Ollama,
     /// llama.cpp HTTP server (OpenAI-compatible, such as llama-server).
     LlamaCppHttp,
@@ -135,10 +136,6 @@ pub enum AiProvider {
     Gemini,
     /// Any OpenAI-compatible endpoint (e.g. LM Studio, vLLM, Groq).
     OpenAiCompat,
-}
-
-impl Default for AiProvider {
-    fn default() -> Self { AiProvider::Ollama }
 }
 
 impl std::fmt::Display for AiProvider {

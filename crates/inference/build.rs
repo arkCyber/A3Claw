@@ -5,9 +5,6 @@
 //! binary to `$OUT_DIR/wasi_nn_infer.wasm`, which is then included via
 //! `include_bytes!` in `backend.rs`.
 
-use std::path::PathBuf;
-use std::process::Command;
-
 fn main() {
     // Only run when wasi-nn feature is active.
     #[cfg(feature = "wasi-nn")]

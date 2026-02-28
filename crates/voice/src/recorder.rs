@@ -162,7 +162,7 @@ fn find_input_config(
         ch_penalty + rate
     });
 
-    for range in &configs {
+    if let Some(range) = configs.first() {
         let rate = if range.min_sample_rate().0 <= preferred_rate
             && preferred_rate <= range.max_sample_rate().0
         {
@@ -170,7 +170,7 @@ fn find_input_config(
         } else {
             range.min_sample_rate()
         };
-        return Ok(range.clone().with_sample_rate(rate));
+        return Ok((*range).with_sample_rate(rate));
     }
 
     // Fall back to default config
