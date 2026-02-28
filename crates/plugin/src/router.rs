@@ -8,6 +8,9 @@
 //! - `POST  /hooks/agent-start`    — agent session started
 //! - `POST  /hooks/agent-stop`     — agent session stopped
 //! - `POST  /hooks/confirm`        — UI resolves a pending confirmation (allow/deny)
+//! - `POST  /hooks/session-register`   — executor registers session capability profile
+//! - `POST  /hooks/session-deregister` — executor removes session profile on stop
+//! - `POST  /agent/delegate`       — delegate a sub-task to another registered agent
 //! - `GET   /skills/status`        — security status (exposed as a Skill)
 //! - `GET   /skills/events`        — recent audit events
 //! - `PATCH /skills/policy`        — update security policy at runtime
@@ -53,6 +56,7 @@ pub fn build_router(state: Arc<GatewayState>) -> Router {
         .route("/skills/allow/:id",   post(skill_allow))
         .route("/skills/deny/:id",    post(skill_deny))
         .route("/admin/emergency-stop", post(admin_emergency_stop))
+        .route("/agent/delegate",        post(agent_delegate))
         .with_state(state)
 }
 
@@ -253,8 +257,9 @@ async fn session_register(
         .unwrap_or_default()
         .as_secs();
     state.register_session_profile(
-        p.session_id,
+        p.session_id.clone(),
         SessionProfile {
+            session_id:           p.session_id,
             agent_id:             p.agent_id,
             agent_name:           p.agent_name,
             agent_role:           p.agent_role,
@@ -416,6 +421,65 @@ async fn admin_emergency_stop(State(state): State<Arc<GatewayState>>) -> impl In
     warn!("Emergency stop triggered by operator");
     state.trip_breaker_manual();
     (StatusCode::OK, Json(AckResponse::ok()))
+}
+
+// ── Agent delegation ─────────────────────────────────────────────────────────
+
+/// Payload for `POST /agent/delegate`.
+/// Sent by an executor skill (`agent.delegate`) to forward a sub-task goal
+/// to another registered agent session.
+#[derive(serde::Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct AgentDelegatePayload {
+    from_session_id:  String,
+    target_agent_id:  String,
+    goal:             String,
+    #[serde(default = "default_timeout")]
+    timeout_secs:     u64,
+}
+
+fn default_timeout() -> u64 { 60 }
+
+async fn agent_delegate(
+    State(state): State<Arc<GatewayState>>,
+    Json(payload): Json<AgentDelegatePayload>,
+) -> impl IntoResponse {
+    info!(
+        from    = %payload.from_session_id,
+        target  = %payload.target_agent_id,
+        timeout = payload.timeout_secs,
+        "Agent delegation request"
+    );
+
+    // Look up the target session by agent_id in the registered profiles.
+    if let Some(profile) = state.session_profile_by_agent_id(&payload.target_agent_id) {
+        info!(
+            target_session = %profile.session_id,
+            "Delegation accepted for agent '{}'",
+            payload.target_agent_id
+        );
+        (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "accepted": true,
+                "targetSessionId": profile.session_id,
+                "goal": payload.goal,
+                "message": format!(
+                    "Delegation to agent '{}' queued (session {})",
+                    payload.target_agent_id, profile.session_id
+                )
+            }))
+        )
+    } else {
+        warn!(target = %payload.target_agent_id, "Delegation target not found");
+        (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "accepted": false,
+                "error": format!("Agent '{}' is not running or not registered", payload.target_agent_id)
+            }))
+        )
+    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────────────────────

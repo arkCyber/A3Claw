@@ -18,16 +18,18 @@ use tracing::warn;
 const MAX_EVENTS: usize = 500;
 
 /// Per-session agent profile registered by the executor at task start.
-/// Carries the capability whitelist so `before_skill` can enforce per-agent policy.
+/// Carries the capability list so `before_skill` can enforce per-agent policy.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionProfile {
+    /// Session ID assigned by the executor (UUID string).
+    pub session_id: String,
     /// Agent UUID (matches AgentProfile::id).
     pub agent_id: String,
     /// Human-readable display name.
     pub agent_name: String,
-    /// Role string (e.g. "IntelOfficer").
+    /// Role string (such as "IntelOfficer").
     pub agent_role: String,
-    /// Capability IDs the agent is allowed to use (e.g. ["web.fetch", "shell.read"]).
+    /// Capability IDs the agent is allowed to use (such as ["web.fetch", "shell.read"]).
     pub allowed_capabilities: Vec<String>,
     /// Unix timestamp when the session was registered.
     pub registered_at: u64,
@@ -290,6 +292,16 @@ impl GatewayState {
 
     /// Returns `true` if `skill_name` is in the session's capability whitelist.
     /// If no profile is registered for the session, the check passes (default-allow).
+    /// Look up a session profile by its owning `agent_id` (not session_id).
+    /// Used by the `agent.delegate` route to locate a running target agent.
+    pub fn session_profile_by_agent_id(&self, agent_id: &str) -> Option<SessionProfile> {
+        self.session_profiles
+            .read()
+            .values()
+            .find(|p| p.agent_id == agent_id)
+            .cloned()
+    }
+
     pub fn is_skill_allowed_for_session(&self, session_id: &str, skill_name: &str) -> bool {
         match self.session_profiles.read().get(session_id) {
             None => true, // no profile → default-allow (backward-compat)
@@ -349,6 +361,7 @@ mod tests {
     fn session_register_and_lookup() {
         let s = make_state();
         s.register_session_profile("sess-1", SessionProfile {
+            session_id:           "sess-1".into(),
             agent_id:             "agent-1".into(),
             agent_name:           "Alice".into(),
             agent_role:           "IntelOfficer".into(),
@@ -363,6 +376,7 @@ mod tests {
     fn session_capability_exact_match_allowed() {
         let s = make_state();
         s.register_session_profile("sess-2", SessionProfile {
+            session_id:           "sess-2".into(),
             agent_id:             "a".into(),
             agent_name:           "B".into(),
             agent_role:           "r".into(),
@@ -377,6 +391,7 @@ mod tests {
     fn session_capability_wildcard_allowed() {
         let s = make_state();
         s.register_session_profile("sess-3", SessionProfile {
+            session_id:           "sess-3".into(),
             agent_id:             "a".into(),
             agent_name:           "B".into(),
             agent_role:           "r".into(),
@@ -398,6 +413,7 @@ mod tests {
     fn empty_capability_list_allows_all() {
         let s = make_state();
         s.register_session_profile("sess-4", SessionProfile {
+            session_id:           "sess-4".into(),
             agent_id:             "a".into(),
             agent_name:           "B".into(),
             agent_role:           "r".into(),
@@ -412,6 +428,7 @@ mod tests {
         let s = make_state();
         s.on_agent_start("sess-5");
         s.register_session_profile("sess-5", SessionProfile {
+            session_id:           "sess-5".into(),
             agent_id:             "a".into(),
             agent_name:           "B".into(),
             agent_role:           "r".into(),

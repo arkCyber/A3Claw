@@ -383,7 +383,7 @@ pub async fn run_react_loop(
 
             let t0 = std::time::Instant::now();
             let result = dispatcher
-                .dispatch(session_id, skill_name, args.clone())
+                .dispatch(session_id, skill_name, args.clone(), ctx)
                 .await
                 .unwrap_or_else(|e| SkillResult::error_result(skill_name, &e.to_string()));
 

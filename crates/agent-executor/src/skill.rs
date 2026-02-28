@@ -410,7 +410,28 @@ pub static BUILTIN_SKILLS: &[Skill] = &[
         risk: SkillRisk::Safe,
         params: &[],
     },
-    // ── Security / audit ──────────────────────────────────────────────────
+    // ── Agent collaboration ──────────────────────────────────────────────────
+    Skill {
+        name: "agent.delegate",
+        display: "Delegate to Agent",
+        description: "Delegate a sub-task to another available agent and return its result.",
+        category: SkillCategory::Agent,
+        risk: SkillRisk::Confirm,
+        params: &[
+            SkillParam { name: "agent_id",   description: "Target agent ID to delegate to",  required: true,  param_type: "string" },
+            SkillParam { name: "goal",        description: "Sub-task goal for the target agent", required: true, param_type: "string" },
+            SkillParam { name: "timeout_secs",description: "Max seconds to wait for result",  required: false, param_type: "integer" },
+        ],
+    },
+    Skill {
+        name: "agent.clearMemory",
+        display: "Clear Memory",
+        description: "Clear all entries from the agent's persistent memory store.",
+        category: SkillCategory::Agent,
+        risk: SkillRisk::Confirm,
+        params: &[],
+    },
+    // ── Security / audit ──────────────────────────────────────────────────────
     Skill {
         name: "security.getStatus",
         display: "Security Status",

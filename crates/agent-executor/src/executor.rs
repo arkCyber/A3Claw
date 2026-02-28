@@ -73,6 +73,8 @@ pub enum ExecutorEvent {
     RunFailed { run_id: String, error_code: String, message: String },
     /// Skill was denied by gateway.
     SkillDenied { run_id: String, skill_name: String, reason: String },
+    /// Skill is waiting for human confirmation (Gateway returned `confirm`).
+    SkillPendingConfirm { run_id: String, skill_name: String, invocation_id: String },
     /// Agent session registered.
     SessionRegistered { agent_id: String, session_id: String },
     /// Progress message (free text for UI log).
