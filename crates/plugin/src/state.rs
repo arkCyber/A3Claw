@@ -334,3 +334,114 @@ impl GatewayState {
         self.config.read().clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_state() -> Arc<GatewayState> {
+        GatewayState::new(SecurityConfig::default())
+    }
+
+    // ── Session profile routing ───────────────────────────────────────────────
+
+    #[test]
+    fn session_register_and_lookup() {
+        let s = make_state();
+        s.register_session_profile("sess-1", SessionProfile {
+            agent_id:             "agent-1".into(),
+            agent_name:           "Alice".into(),
+            agent_role:           "IntelOfficer".into(),
+            allowed_capabilities: vec!["web.fetch".into(), "fs.readFile".into()],
+            registered_at:        0,
+        });
+        let p = s.session_profile("sess-1").expect("profile should exist");
+        assert_eq!(p.agent_name, "Alice");
+    }
+
+    #[test]
+    fn session_capability_exact_match_allowed() {
+        let s = make_state();
+        s.register_session_profile("sess-2", SessionProfile {
+            agent_id:             "a".into(),
+            agent_name:           "B".into(),
+            agent_role:           "r".into(),
+            allowed_capabilities: vec!["web.fetch".into()],
+            registered_at:        0,
+        });
+        assert!(s.is_skill_allowed_for_session("sess-2", "web.fetch"));
+        assert!(!s.is_skill_allowed_for_session("sess-2", "shell.exec"));
+    }
+
+    #[test]
+    fn session_capability_wildcard_allowed() {
+        let s = make_state();
+        s.register_session_profile("sess-3", SessionProfile {
+            agent_id:             "a".into(),
+            agent_name:           "B".into(),
+            agent_role:           "r".into(),
+            allowed_capabilities: vec!["fs.*".into()],
+            registered_at:        0,
+        });
+        assert!(s.is_skill_allowed_for_session("sess-3", "fs.readFile"));
+        assert!(s.is_skill_allowed_for_session("sess-3", "fs.writeFile"));
+        assert!(!s.is_skill_allowed_for_session("sess-3", "shell.exec"));
+    }
+
+    #[test]
+    fn no_session_profile_defaults_allow() {
+        let s = make_state();
+        assert!(s.is_skill_allowed_for_session("unknown-session", "shell.exec"));
+    }
+
+    #[test]
+    fn empty_capability_list_allows_all() {
+        let s = make_state();
+        s.register_session_profile("sess-4", SessionProfile {
+            agent_id:             "a".into(),
+            agent_name:           "B".into(),
+            agent_role:           "r".into(),
+            allowed_capabilities: vec![],
+            registered_at:        0,
+        });
+        assert!(s.is_skill_allowed_for_session("sess-4", "shell.exec"));
+    }
+
+    #[test]
+    fn on_agent_stop_removes_profile() {
+        let s = make_state();
+        s.on_agent_start("sess-5");
+        s.register_session_profile("sess-5", SessionProfile {
+            agent_id:             "a".into(),
+            agent_name:           "B".into(),
+            agent_role:           "r".into(),
+            allowed_capabilities: vec!["web.fetch".into()],
+            registered_at:        0,
+        });
+        s.on_agent_stop("sess-5");
+        assert!(s.session_profile("sess-5").is_none());
+    }
+
+    // ── Statistics counters ───────────────────────────────────────────────────
+
+    #[test]
+    fn increment_counters() {
+        let s = make_state();
+        s.increment_allowed();
+        s.increment_allowed();
+        s.increment_denied();
+        let stats = s.stats();
+        assert_eq!(stats.allowed_count, 2);
+        assert_eq!(stats.denied_count, 1);
+    }
+
+    // ── Permanent allow set ───────────────────────────────────────────────────
+
+    #[test]
+    fn permanent_allow_roundtrip() {
+        let s = make_state();
+        assert!(!s.is_permanently_allowed("fs.writeFile"));
+        s.add_permanent_allow("fs.writeFile");
+        assert!(s.is_permanently_allowed("fs.writeFile"));
+    }
+}

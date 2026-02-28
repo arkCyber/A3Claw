@@ -188,3 +188,86 @@ fn format_ts(ts: u64) -> String {
     let day = (day_of_year % 30) + 1;
     format!("{}-{:02}-{:02}", year_approx, month.min(12), day.min(31))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_item(is_new: bool, category: IntelCategory) -> IntelItem {
+        IntelItem {
+            title: "Test".into(),
+            source_name: "src".into(),
+            url: "https://example.com".into(),
+            snippet: "snippet".into(),
+            ai_summary: String::new(),
+            category,
+            fetched_at: 0,
+            is_new,
+        }
+    }
+
+    #[test]
+    fn report_new_counts_correctly() {
+        let items = vec![
+            make_item(true,  IntelCategory::Competitor),
+            make_item(false, IntelCategory::Tech),
+            make_item(true,  IntelCategory::Industry),
+        ];
+        let r = IntelReport::new(items, 3);
+        assert_eq!(r.changed_count, 2);
+        assert_eq!(r.new_items().len(), 2);
+        assert_eq!(r.targets_checked, 3);
+    }
+
+    #[test]
+    fn report_by_category_filters() {
+        let items = vec![
+            make_item(true,  IntelCategory::Tech),
+            make_item(false, IntelCategory::Tech),
+            make_item(true,  IntelCategory::Finance),
+        ];
+        let r = IntelReport::new(items, 3);
+        assert_eq!(r.by_category(&IntelCategory::Tech).len(), 2);
+        assert_eq!(r.by_category(&IntelCategory::Finance).len(), 1);
+        assert_eq!(r.by_category(&IntelCategory::Competitor).len(), 0);
+    }
+
+    #[test]
+    fn report_summary_stats_correct() {
+        let items = vec![
+            make_item(true,  IntelCategory::Competitor),
+            make_item(true,  IntelCategory::Industry),
+            make_item(false, IntelCategory::Tech),
+            make_item(true,  IntelCategory::Finance),
+        ];
+        let r = IntelReport::new(items, 4);
+        let s = r.summary_stats();
+        assert_eq!(s.total, 4);
+        assert_eq!(s.new_count, 3);
+        assert_eq!(s.competitor, 1);
+        assert_eq!(s.tech, 1);
+        assert_eq!(s.finance, 1);
+    }
+
+    #[test]
+    fn intel_category_labels() {
+        assert_eq!(IntelCategory::Competitor.label_zh(), "竞品动态");
+        assert!(IntelCategory::Tech.color_rgb().1 > 0.5);
+    }
+
+    #[test]
+    fn monitor_target_new() {
+        use crate::monitor::MonitorTarget;
+        let t = MonitorTarget::new("Site", "https://site.example");
+        assert_eq!(t.name, "Site");
+        assert!(!t.is_rss);
+        assert!(t.last_fingerprint.is_empty());
+    }
+
+    #[test]
+    fn monitor_target_rss_flag() {
+        use crate::monitor::MonitorTarget;
+        let t = MonitorTarget::rss("Feed", "https://feed.example/rss");
+        assert!(t.is_rss);
+    }
+}
