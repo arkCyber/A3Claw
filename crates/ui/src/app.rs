@@ -4074,14 +4074,19 @@ impl cosmic::Application for OpenClawApp {
                                     messages,
                                     max_tokens_override: Some(512),
                                     temperature_override: Some(0.7),
-                                    stream: false,
+                                    stream: true,
                                 };
-                                match engine_arc.infer(req).await {
-                                    Ok(resp) => {
-                                        eprintln!("[CLAW-AGENT] response ({} ms): {:.120}", start.elapsed().as_millis(), resp.content);
+                                match engine_arc.infer_stream(req).await {
+                                    Ok(mut rx) => {
+                                        let mut full_content = String::new();
+                                        while let Some(token) = rx.recv().await {
+                                            full_content.push_str(&token.delta);
+                                            if token.done { break; }
+                                        }
+                                        eprintln!("[CLAW-AGENT] streaming response ({} ms): {:.120}", start.elapsed().as_millis(), full_content);
                                         AppMessage::ClawAgentResponse {
                                             agent_id: agent_id_clone,
-                                            content: resp.content,
+                                            content: full_content,
                                             latency_ms: start.elapsed().as_millis() as u64,
                                             user_entry_id: entry_id,
                                         }
@@ -5762,6 +5767,9 @@ impl OpenClawApp {
                                         ("❌", format!("[{}] {}", error_code, message.chars().take(60).collect::<String>()), c_run_err),
                                     ExecutorEvent::Log { message, .. } =>
                                         ("·", message.chars().take(80).collect::<String>(), c_muted2),
+                                    &ExecutorEvent::SkillPendingConfirm { .. } => {
+                                        ("⏸", "Skill pending confirmation".to_string(), cosmic::theme::active().cosmic().accent_color().into())
+                                    }
                                 };
                                 Element::from(
                                     widget::row()
