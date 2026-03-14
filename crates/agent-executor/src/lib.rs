@@ -36,9 +36,11 @@ pub mod executor;
 pub mod react;
 pub mod session;
 pub mod skill;
+pub mod skill_manager;
 
 pub use executor::{AgentExecutor, ExecutorConfig, ExecutorEvent, ExecutorHandle};
 pub use context::{TaskContext, TaskGoal, StepRecord, MemoryStore};
 pub use skill::{Skill, SkillCategory, SkillSet, BUILTIN_SKILLS};
 pub use session::{SessionRegistry, AgentSession, SessionId};
+pub use skill_manager::{SkillManager, SkillManifest, SkillInfo, SkillRequest, SkillResponse};
 pub use error::ExecutorError;

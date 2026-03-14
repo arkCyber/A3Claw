@@ -5,17 +5,16 @@ edition = "2021"
 description = "OpenClaw+ to Moltis compatibility bridge"
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "1.0"
-tokio = { version = "1.0", features = ["full"] }
-# WASM runtime dependencies
-wasmedge-sdk = { version = "0.13", optional = true }
-wasmedge-sys = { version = "0.17", optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+# WASM runtime dependencies - optional, disabled by default to avoid bindgen issues
+# wasmedge-sdk = { workspace = true, optional = true }
 
 [features]
-default = ["wasm-runtime"]
-wasm-runtime = ["wasmedge-sdk", "wasmedge-sys"]
+default = []
+# wasm-runtime = ["wasmedge-sdk"]  # Disabled due to bindgen issues
 
 [dev-dependencies]
 tokio-test = "0.4"

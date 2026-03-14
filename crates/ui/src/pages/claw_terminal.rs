@@ -310,9 +310,9 @@ impl ClawTerminalPage {
                         widget::text("Type a command below or click a Quick Action button.")
                             .size(12).class(cosmic::theme::Text::Color(color_muted)).into(),
                         widget::Space::new(0, 8).into(),
-                        widget::text("Built-in: status, sandbox start/stop, emergency stop,")
+                        widget::text("Built-in: status, emergency stop, models list,")
                             .size(11).class(cosmic::theme::Text::Color(color_muted)).into(),
-                        widget::text("          models list, events clear, config show, ai restart, help")
+                        widget::text("          events clear, config show, ai restart, help")
                             .size(11).class(cosmic::theme::Text::Color(color_muted)).into(),
                         widget::Space::new(0, 4).into(),
                         widget::text("Shell: any system command (ls, pwd, git status, …)")

@@ -23,6 +23,7 @@ async-trait = "0.1"
 
 openclaw-security = { path = "../security" }
 openclaw-storage = { path = "../storage" }
+openclaw-plugin-sdk = { path = "../plugin-sdk" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }

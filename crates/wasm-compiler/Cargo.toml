@@ -5,9 +5,8 @@ edition.workspace = true
 description = "WASM compiler for OpenClaw skills"
 
 [dependencies]
-# WASM compilation
+# WASM compilation - use workspace version only
 wasmedge-sdk = { workspace = true }
-wasmedge-sys = { version = "0.19" }
 
 # Code generation
 proc-macro2 = "1.0"

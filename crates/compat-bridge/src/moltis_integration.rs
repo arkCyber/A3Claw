@@ -125,7 +125,7 @@ impl MoltisToolRegistry {
         let registered = self.registered_tools.read().await;
         let mut stats = ToolStats::default();
         
-        for tool in registered {
+        for tool in registered.iter() {
             stats.total_tools += 1;
             
             match tool.handler_type {

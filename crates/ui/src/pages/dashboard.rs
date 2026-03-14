@@ -209,13 +209,6 @@ impl DashboardPage {
         };
 
         let control_row = widget::row::with_children(vec![
-            widget::button::suggested(tx(lang, "Start Sandbox"))
-                .on_press(AppMessage::StartSandbox)
-                .into(),
-            widget::button::text(tx(lang, "Stop Sandbox"))
-                .on_press(AppMessage::StopSandbox)
-                .class(cosmic::theme::Button::Standard)
-                .into(),
             emergency_btn,
             widget::Space::new(Length::Fill, 0).into(),
             widget::button::text(tx(lang, "Clear Log"))

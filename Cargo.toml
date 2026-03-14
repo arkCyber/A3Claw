@@ -13,6 +13,16 @@ members = [
     "crates/wasi-nn-infer",
     "crates/intel",
     "crates/agent-executor",
+    # High-priority modules (Phase 1) - non-WASM dependent
+    "crates/skills",
+    "crates/plugin-sdk",
+    "crates/server-manager",
+    "crates/assistant-test",
+    # WASM modules (Phase 2) - compat-bridge enabled with basic implementation
+    "crates/compat-bridge",
+    # "crates/wasm-compiler",
+    # "crates/wasm-plugin",
+    # "crates/wasm-runtime",
 ]
 resolver = "2"
 

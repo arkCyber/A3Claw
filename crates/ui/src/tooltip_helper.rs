@@ -14,13 +14,12 @@ fn create_triangle_arrow<'a>(
     position: TooltipPosition,
     style: BubbleStyle,
 ) -> Element<'a, AppMessage> {
-    // Use softer, rounder pointer glyphs: ◆ (diamond) is less sharp than ▲.
-    // These feel gentler and blend better with rounded bubble corners.
+    // Use smaller, more elegant diamond pointer with better sizing
     let (arrow_char, w, h, font_sz) = match position {
-        TooltipPosition::Bottom => ("\u{25c6}", 18u16, 14u16, 12u16), // ◆ diamond above
-        TooltipPosition::Top    => ("\u{25c6}", 18u16, 14u16, 12u16), // ◆ diamond below
-        TooltipPosition::Left   => ("\u{25c6}", 14u16, 18u16, 12u16), // ◆ diamond right
-        TooltipPosition::Right  => ("\u{25c6}", 14u16, 18u16, 12u16), // ◆ diamond left
+        TooltipPosition::Bottom => ("◆", 16u16, 12u16, 10u16), // Smaller diamond above
+        TooltipPosition::Top    => ("◆", 16u16, 12u16, 10u16), // Smaller diamond below
+        TooltipPosition::Left   => ("◆", 12u16, 16u16, 10u16), // Smaller diamond right
+        TooltipPosition::Right  => ("◆", 12u16, 16u16, 10u16), // Smaller diamond left
         TooltipPosition::FollowCursor => return Space::new(0, 0).into(),
     };
 
@@ -67,83 +66,83 @@ impl BubbleStyle {
         bg_color: Color::from_rgba(0.13, 0.13, 0.16, 0.96),
         border_width: 1.0,
         border_color: Color::from_rgba(0.90, 0.74, 0.48, 0.92),
-        border_radius: 10.0,
-        shadow_offset: (0.0, 3.0),
-        shadow_blur: 12.0,
-        shadow_color: Color::from_rgba(0.0, 0.0, 0.0, 0.45),
+        border_radius: 12.0,  // Slightly more rounded
+        shadow_offset: (0.0, 4.0),  // Deeper shadow
+        shadow_blur: 16.0,    // Softer blur
+        shadow_color: Color::from_rgba(0.0, 0.0, 0.0, 0.5),
         text_color: Color::from_rgb(0.96, 0.96, 0.98),
         icon_color: Color::from_rgb(0.96, 0.82, 0.54),
-        padding: (8.0, 13.0),
+        padding: (10.0, 15.0), // More padding for better readability
     };
 
-    /// Accent style - 1.0px warm amber border
+    /// Accent style - warm amber border with enhanced visibility
     pub const ACCENT: Self = Self {
         bg_color: Color::from_rgba(0.12, 0.15, 0.22, 0.98),
-        border_width: 1.0,
+        border_width: 1.2,  // Slightly thicker border
         border_color: Color::from_rgba(0.95, 0.75, 0.35, 0.95),
-        border_radius: 10.0,
+        border_radius: 12.0,
         shadow_offset: (0.0, 4.0),
-        shadow_blur: 12.0,
+        shadow_blur: 14.0,
         shadow_color: Color::from_rgba(0.0, 0.0, 0.0, 0.4),
         text_color: Color::from_rgb(0.98, 0.98, 1.0),
         icon_color: Color::from_rgb(1.0, 0.85, 0.45),
-        padding: (10.0, 14.0),
+        padding: (10.0, 15.0),
     };
 
-    /// Success style - 1.0px green border
+    /// Success style - green border with fresh look
     pub const SUCCESS: Self = Self {
         bg_color: Color::from_rgba(0.10, 0.18, 0.14, 0.98),
-        border_width: 1.0,
+        border_width: 1.2,
         border_color: Color::from_rgba(0.22, 0.82, 0.46, 0.90),
-        border_radius: 8.0,
+        border_radius: 10.0,
         shadow_offset: (0.0, 3.0),
-        shadow_blur: 10.0,
+        shadow_blur: 12.0,
         shadow_color: Color::from_rgba(0.0, 0.0, 0.0, 0.35),
         text_color: Color::from_rgb(0.96, 0.98, 0.96),
         icon_color: Color::from_rgb(0.32, 0.92, 0.56),
-        padding: (8.0, 12.0),
+        padding: (9.0, 14.0),
     };
 
-    /// Warning style - 1.0px orange border
+    /// Warning style - orange border with warm tone
     pub const WARNING: Self = Self {
         bg_color: Color::from_rgba(0.20, 0.16, 0.10, 0.98),
-        border_width: 1.0,
+        border_width: 1.2,
         border_color: Color::from_rgba(0.98, 0.72, 0.28, 0.90),
-        border_radius: 8.0,
+        border_radius: 10.0,
         shadow_offset: (0.0, 3.0),
-        shadow_blur: 10.0,
+        shadow_blur: 12.0,
         shadow_color: Color::from_rgba(0.0, 0.0, 0.0, 0.35),
         text_color: Color::from_rgb(0.98, 0.96, 0.94),
         icon_color: Color::from_rgb(1.0, 0.82, 0.38),
-        padding: (8.0, 12.0),
+        padding: (9.0, 14.0),
     };
 
-    /// Danger style - 1.0px red border
+    /// Danger style - red border with strong contrast
     pub const DANGER: Self = Self {
         bg_color: Color::from_rgba(0.20, 0.10, 0.12, 0.98),
-        border_width: 1.0,
+        border_width: 1.3,  // Slightly thicker for danger
         border_color: Color::from_rgba(0.96, 0.28, 0.32, 0.95),
-        border_radius: 8.0,
+        border_radius: 10.0,
         shadow_offset: (0.0, 3.0),
-        shadow_blur: 10.0,
+        shadow_blur: 12.0,
         shadow_color: Color::from_rgba(0.0, 0.0, 0.0, 0.4),
         text_color: Color::from_rgb(0.98, 0.96, 0.96),
         icon_color: Color::from_rgb(1.0, 0.38, 0.42),
-        padding: (8.0, 12.0),
+        padding: (9.0, 14.0),
     };
 
-    /// Subtle style - minimal warm border
+    /// Subtle style - minimal warm border for secondary info
     pub const SUBTLE: Self = Self {
         bg_color: Color::from_rgba(0.18, 0.18, 0.20, 0.95),
-        border_width: 1.0,
+        border_width: 0.8,  // Thinner border for subtle look
         border_color: Color::from_rgba(0.70, 0.60, 0.45, 0.65),
-        border_radius: 6.0,
+        border_radius: 8.0,  // Slightly smaller radius
         shadow_offset: (0.0, 2.0),
-        shadow_blur: 6.0,
+        shadow_blur: 8.0,
         shadow_color: Color::from_rgba(0.0, 0.0, 0.0, 0.2),
         text_color: Color::from_rgb(0.92, 0.92, 0.94),
         icon_color: Color::from_rgb(0.88, 0.78, 0.62),
-        padding: (6.0, 10.0),
+        padding: (7.0, 12.0),
     };
 }
 
@@ -211,14 +210,14 @@ pub fn with_tooltip_bubble_styled_arrow<'a>(
     style: BubbleStyle,
     show_arrow: bool,
 ) -> Element<'a, AppMessage> {
-    // Add directional arrow based on position
+    // Add directional arrow based on position - use diamond for consistency
     let arrow = if show_arrow {
         match position {
-            TooltipPosition::Top => "▼ ",
-            TooltipPosition::Bottom => "▲ ",
-            TooltipPosition::Left => "▶ ",
-            TooltipPosition::Right => "◀ ",
-            TooltipPosition::FollowCursor => "● ",
+            TooltipPosition::Top => "◆ ",
+            TooltipPosition::Bottom => "◆ ",
+            TooltipPosition::Left => "◆ ",
+            TooltipPosition::Right => "◆ ",
+            TooltipPosition::FollowCursor => "◆ ",
         }
     } else {
         ""
@@ -399,6 +398,21 @@ pub fn with_tooltip_i18n<'a>(
     with_tooltip(content, text, position)
 }
 
+/// Add bilingual tooltip with bubble style and arrow indicator
+pub fn with_tooltip_bubble_i18n_arrow<'a>(
+    content: impl Into<Element<'a, AppMessage>>,
+    lang: Language,
+    en_text: &'a str,
+    zh_text: &'a str,
+    position: TooltipPosition,
+) -> Element<'a, AppMessage> {
+    let text = match lang {
+        Language::ZhCn | Language::ZhTw => zh_text,
+        _ => en_text,
+    };
+    with_tooltip_bubble_styled_arrow(content, text, position, BubbleStyle::DEFAULT, true)
+}
+
 /// Add bilingual tooltip with bubble style
 pub fn with_tooltip_bubble_i18n<'a>(
     content: impl Into<Element<'a, AppMessage>>,
@@ -411,7 +425,7 @@ pub fn with_tooltip_bubble_i18n<'a>(
         Language::ZhCn | Language::ZhTw => zh_text,
         _ => en_text,
     };
-    with_tooltip_bubble(content, text, position)
+    with_tooltip_bubble_styled_arrow(content, text, position, BubbleStyle::DEFAULT, true)
 }
 
 /// Add bilingual tooltip with bubble style and icon
@@ -676,25 +690,50 @@ impl TooltipTexts {
     pub const SETTINGS_FILTER_MODELS: (&'static str, &'static str) = 
         ("Filter models by name or family", "按名称或系列筛选模型");
 
-    // Dashboard tooltips
-    pub const DASHBOARD_START: (&'static str, &'static str) = 
-        ("Start sandbox environment", "启动沙箱环境");
+    // Dashboard tooltips with icons
+    pub const DASHBOARD_START: (&'static str, &'static str, &'static str) = 
+        ("Start sandbox environment", "启动沙箱环境", "▶️");
     
-    pub const DASHBOARD_STOP: (&'static str, &'static str) = 
-        ("Stop sandbox environment", "停止沙箱环境");
+    pub const DASHBOARD_STOP: (&'static str, &'static str, &'static str) = 
+        ("Stop sandbox environment", "停止沙箱环境", "⏹️");
     
-    pub const DASHBOARD_EMERGENCY: (&'static str, &'static str) = 
-        ("Emergency stop all operations", "紧急停止所有操作");
+    pub const DASHBOARD_EMERGENCY: (&'static str, &'static str, &'static str) = 
+        ("Emergency stop all operations", "紧急停止所有操作", "🛑");
     
-    pub const DASHBOARD_EMERGENCY_STOP: (&'static str, &'static str) = 
-        ("Emergency stop - immediately halt all operations", "紧急停止 - 立即停止所有操作");
+    pub const DASHBOARD_EMERGENCY_STOP: (&'static str, &'static str, &'static str) = 
+        ("Emergency stop - immediately halt all operations", "紧急停止 - 立即停止所有操作", "⛔");
     
-    pub const DASHBOARD_CLEAR: (&'static str, &'static str) = 
-        ("Clear event log", "清空事件日志");
+    pub const DASHBOARD_CLEAR: (&'static str, &'static str, &'static str) = 
+        ("Clear event log", "清空事件日志", "🗑️");
     
-    pub const DASHBOARD_ALLOW: (&'static str, &'static str) = 
-        ("Allow this operation", "允许此操作");
+    pub const DASHBOARD_ALLOW: (&'static str, &'static str, &'static str) = 
+        ("Allow this operation", "允许此操作", "✅");
     
-    pub const DASHBOARD_DENY: (&'static str, &'static str) = 
-        ("Deny this operation", "拒绝此操作");
+    pub const DASHBOARD_DENY: (&'static str, &'static str, &'static str) = 
+        ("Deny this operation", "拒绝此操作", "❌");
+
+    // Sidebar navigation tooltips with icons
+    pub const SIDEBAR_DASHBOARD: (&'static str, &'static str, &'static str) = 
+        ("View system dashboard and status", "查看系统仪表盘和状态", "🏠");
+    
+    pub const SIDEBAR_EVENTS: (&'static str, &'static str, &'static str) = 
+        ("Browse event history and logs", "浏览事件历史和日志", "📊");
+    
+    pub const SIDEBAR_ASSISTANT: (&'static str, &'static str, &'static str) = 
+        ("AI Assistant for system maintenance and diagnostics", "AI 助手 - 系统维护和诊断", "🤖");
+    
+    pub const SIDEBAR_CLAW_TERMINAL: (&'static str, &'static str, &'static str) = 
+        ("Claw Terminal for command execution", "Claw 终端 - 命令执行", "💻");
+    
+    pub const SIDEBAR_AGENTS: (&'static str, &'static str, &'static str) = 
+        ("Manage digital workers and agents", "管理数字员工和代理", "👥");
+    
+    pub const SIDEBAR_AUDIT_REPLAY: (&'static str, &'static str, &'static str) = 
+        ("Replay and audit system events", "回放和审计系统事件", "🔍");
+    
+    pub const SIDEBAR_SETTINGS: (&'static str, &'static str, &'static str) = 
+        ("Security and system settings", "安全和系统设置", "🛡️");
+    
+    pub const SIDEBAR_GENERAL_SETTINGS: (&'static str, &'static str, &'static str) = 
+        ("General application settings", "通用应用程序设置", "⚙️");
 }

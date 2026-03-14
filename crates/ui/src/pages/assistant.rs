@@ -17,7 +17,7 @@ use openclaw_security::SecurityConfig;
 
 use crate::app::AppMessage;
 use crate::theme::Language;
-use crate::tooltip_helper::{with_tooltip_bubble_icon_arrow_i18n, TooltipPosition, TooltipTexts};
+use crate::tooltip_helper::{with_tooltip_bubble, with_tooltip_bubble_icon_arrow_i18n, TooltipPosition, TooltipTexts};
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -356,68 +356,23 @@ impl AssistantPage {
 
     fn view_quick_actions<'a>(
         lang: Language,
-        sandbox_running: bool,
+        _sandbox_running: bool,
         pending_count: usize,
     ) -> Element<'a, AppMessage> {
-        let (lbl_start, lbl_stop, lbl_emergency, lbl_clear, _lbl_dashboard, lbl_section,
+        let (lbl_emergency, lbl_clear, _lbl_dashboard, lbl_section,
              lbl_pending, lbl_go_dash) =
             match lang {
                 Language::ZhCn | Language::ZhTw => (
-                    "▶ 启动", "■ 停止", "⛔ 紧急停止", "🗑 清空日志",
+                    "⛔ 紧急停止", "🗑 清空日志",
                     "仪表板", "系统维护操作",
                     "待确认", "查看",
                 ),
                 _ => (
-                    "▶ Start", "■ Stop", "⛔ Emergency", "🗑 Clear Log",
+                    "⛔ Emergency", "🗑 Clear Log",
                     "Dashboard", "System Maintenance",
                     "Pending", "View",
                 ),
             };
-
-        // Sandbox control buttons — compact uniform sizing with outline
-        let start_btn = widget::container(
-            widget::button::custom(
-                widget::text(lbl_start).size(13)
-                    .class(cosmic::theme::Text::Default)
-            )
-            .padding([6, 12])
-            .class(if sandbox_running {
-                cosmic::theme::Button::Standard
-            } else {
-                cosmic::theme::Button::Suggested
-            })
-            .on_press(AppMessage::StartSandbox)
-        )
-        .style(move |_: &cosmic::Theme| ContainerStyle {
-            border: cosmic::iced::Border {
-                radius: 8.0.into(),
-                color: if sandbox_running {
-                    cosmic::iced::Color::from_rgba(0.55, 0.53, 0.50, 0.45)
-                } else {
-                    cosmic::iced::Color::from_rgba(0.22, 0.82, 0.46, 0.6)
-                },
-                width: 1.5,
-            },
-            ..Default::default()
-        });
-
-        let stop_btn = widget::container(
-            widget::button::custom(
-                widget::text(lbl_stop).size(13)
-                    .class(cosmic::theme::Text::Default)
-            )
-            .padding([6, 12])
-            .class(cosmic::theme::Button::Standard)
-            .on_press(AppMessage::StopSandbox)
-        )
-        .style(|_: &cosmic::Theme| ContainerStyle {
-            border: cosmic::iced::Border {
-                radius: 8.0.into(),
-                color: cosmic::iced::Color::from_rgba(0.55, 0.53, 0.50, 0.45),
-                width: 1.5,
-            },
-            ..Default::default()
-        });
 
         let emergency_btn = widget::button::custom(
             widget::text(lbl_emergency).size(12)
@@ -440,22 +395,6 @@ impl AssistantPage {
         .on_press(AppMessage::ClearEvents);
 
         let control_row = widget::row::with_children(vec![
-            with_tooltip_bubble_icon_arrow_i18n(
-                widget::container(start_btn).width(Length::FillPortion(3)),
-                lang,
-                TooltipTexts::ASSISTANT_START_SANDBOX.0,
-                TooltipTexts::ASSISTANT_START_SANDBOX.1,
-                "▶",
-                TooltipPosition::Bottom,
-            ),
-            with_tooltip_bubble_icon_arrow_i18n(
-                widget::container(stop_btn).width(Length::FillPortion(3)),
-                lang,
-                TooltipTexts::ASSISTANT_STOP_SANDBOX.0,
-                TooltipTexts::ASSISTANT_STOP_SANDBOX.1,
-                "■",
-                TooltipPosition::Bottom,
-            ),
             widget::Space::new(Length::Fill, 0).into(),
             with_tooltip_bubble_icon_arrow_i18n(
                 emergency_btn,
@@ -561,26 +500,26 @@ impl AssistantPage {
         // (display label, query text to send, icon)
         let presets: &[(&str, &str, &str)] = match lang {
             Language::ZhCn | Language::ZhTw => &[
-                ("🔍 诊断", "分析最近的安全事件并提供诊断建议", ""),
-                ("⚡ 优化", "分析当前配置并提供性能优化建议", ""),
-                ("🛡 审计", "检查当前安全策略是否存在漏洞或过宽配置", ""),
-                ("📚 RAG", "检查 RAG 知识库配置和索引状态", ""),
+                ("🔍 诊断", "分析最近的安全事件并提供诊断建议", "🔍"),
+                ("⚡ 优化", "分析当前配置并提供性能优化建议", "⚡"),
+                ("🛡 审计", "检查当前安全策略是否存在漏洞或过宽配置", "🛡"),
+                ("📚 RAG", "检查 RAG 知识库配置和索引状态", "📚"),
             ],
             _ => &[
-                ("🔍 Diagnose", "Analyze recent security events and suggest fixes", ""),
-                ("⚡ Optimize", "Review config and suggest performance improvements", ""),
-                ("🛡 Audit", "Check for security policy gaps or over-permissive rules", ""),
-                ("📚 RAG", "Check RAG knowledge base config and index state", ""),
+                ("🔍 Diagnose", "Analyze recent security events and suggest fixes", "🔍"),
+                ("⚡ Optimize", "Review config and suggest performance improvements", "⚡"),
+                ("🛡 Audit", "Check for security policy gaps or over-permissive rules", "🛡"),
+                ("📚 RAG", "Check RAG knowledge base config and index state", "📚"),
             ],
         };
 
         // Build all 4 chips — each chip sends the query at once on click
         let mut chips: Vec<Element<'static, AppMessage>> = presets
             .iter()
-            .map(|(label, query, _icon)| {
+            .map(|(label, query, icon)| {
                 let lbl: String = label.to_string();
                 let q: String = query.to_string();
-                widget::container(
+                let chip = widget::container(
                     widget::button::custom(widget::text(lbl).size(13))
                         .padding([7, 10])
                         .class(cosmic::theme::Button::Standard)
@@ -595,8 +534,17 @@ impl AssistantPage {
                     },
                     ..Default::default()
                 })
-                .width(Length::Fill)
-                .into()
+                .width(Length::Fill);
+                
+                // Add simple tooltip for preset chips (avoid lifetime issues)
+                with_tooltip_bubble(
+                    chip,
+                    match lang {
+                        Language::ZhCn | Language::ZhTw => "点击发送预设查询",
+                        _ => "Click to send preset query",
+                    },
+                    TooltipPosition::Top,
+                )
             })
             .collect();
 

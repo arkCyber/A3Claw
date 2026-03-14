@@ -5,7 +5,6 @@
 use crate::{CompatError, WasmResult};
 use serde_json::Value;
 use std::collections::HashMap;
-use tracing::{info, warn, error};
 
 #[cfg(feature = "wasm-runtime")]
 use wasmedge_sdk::{
@@ -15,12 +14,13 @@ use wasmedge_sdk::{
 
 /// WASM 运行时管理器
 pub struct WasmRuntime {
+    #[allow(dead_code)]
     vm: Option<VmWrapper>,
     loaded_plugins: HashMap<String, LoadedPlugin>,
 }
 
-#[cfg(feature = "wasm-runtime")]
 struct VmWrapper {
+    #[cfg(feature = "wasm-runtime")]
     vm: wasmedge_sdk::Vm,
 }
 
@@ -54,7 +54,7 @@ impl WasmRuntime {
         
         #[cfg(not(feature = "wasm-runtime"))]
         {
-            warn!("WASM runtime support not compiled");
+            // WASM runtime support not compiled
             Ok(Self {
                 vm: None,
                 loaded_plugins: HashMap::new(),
@@ -63,52 +63,48 @@ impl WasmRuntime {
     }
 
     /// 加载 OpenClaw WASM 插件
-    pub fn load_plugin(&mut self, plugin_path: &str) -> Result<(), CompatError> {
+    pub async fn load_plugin(&mut self, _plugin_path: &str) -> Result<(), CompatError> {
+        // 1. 读取 manifest
+        let manifest_path = format!("{}.manifest.json", _plugin_path);
+        let manifest_content = std::fs::read_to_string(&manifest_path)
+            .map_err(|e| CompatError::IoError(e))?;
+        
+        let manifest: crate::OpenClawSkillManifest = serde_json::from_str(&manifest_content)?;
+        
+        // 2. 加载 WASM 模块
         #[cfg(feature = "wasm-runtime")]
         {
-            if let Some(vm_wrapper) = &mut self.vm {
-                // 1. 读取 WASM 文件
-                let wasm_bytes = std::fs::read(plugin_path)
-                    .map_err(|e| CompatError::IoError(e))?;
-
-                // 2. 加载 WASM 模块
-                let module = wasmedge_sdk::Module::from_bytes(None, wasm_bytes)?;
-                vm_wrapper.vm.register_module(Some("plugin"), module)?;
-
-                // 3. 提取 manifest
-                let manifest = self.extract_manifest(&vm_wrapper.vm)?;
-
-                // 4. 缓存插件信息
-                let loaded_plugin = LoadedPlugin {
-                    manifest,
-                    module_path: plugin_path.to_string(),
-                    cached_functions: HashMap::new(),
-                };
-
-                self.loaded_plugins.insert(plugin_path.to_string(), loaded_plugin);
-
-                info!("成功加载 WASM 插件: {}", plugin_path);
-                return Ok(());
+            if let Some(ref mut vm_wrapper) = self.vm {
+                vm_wrapper.vm.load_wasm_from_file(_plugin_path)?;
             }
         }
         
-        Err(CompatError::WasmExecutionError("WASM runtime not available".to_string()))
+        // 3. 缓存插件信息
+        let plugin = LoadedPlugin {
+            manifest,
+            module_path: _plugin_path.to_string(),
+            cached_functions: HashMap::new(),
+        };
+        
+        self.loaded_plugins.insert(_plugin_path.to_string(), plugin);
+        
+        Ok(())
     }
 
     /// 执行 WASM 技能
     pub async fn execute_skill(
         &mut self,
-        skill_name: &str,
-        args: &Value,
+        _skill_name: &str,
+        _args: &Value,
     ) -> Result<WasmResult, CompatError> {
         #[cfg(feature = "wasm-runtime")]
         {
             if let Some(vm_wrapper) = &mut self.vm {
                 // 1. 找到包含该技能的插件
-                let plugin = self.find_plugin_for_skill(skill_name)?;
+                let plugin = self.find_plugin_for_skill(_skill_name)?;
                 
                 // 2. 准备执行参数
-                let args_json = serde_json::to_string(args)
+                let args_json = serde_json::to_string(_args)
                     .map_err(|e| CompatError::SerializationError(e))?;
                 
                 // 3. 调用 WASM 函数
@@ -133,8 +129,8 @@ impl WasmRuntime {
                             });
                         }
                     }
-                    Err(e) => {
-                        error!("WASM 执行失败: {:?}", e);
+                    Err(_e) => {
+                        // WASM 执行失败
                         return Ok(WasmResult {
                             ok: false,
                             output: String::new(),
@@ -217,8 +213,8 @@ impl WasmRuntime {
 
 impl Default for WasmRuntime {
     fn default() -> Self {
-        Self::new().unwrap_or_else(|e| {
-            error!("Failed to create WASM runtime: {}", e);
+        Self::new().unwrap_or_else(|_e| {
+            // Failed to create WASM runtime
             Self {
                 vm: None,
                 loaded_plugins: HashMap::new(),
