@@ -24,6 +24,8 @@ libcosmic = { workspace = true }
 openclaw-security = { path = "../security" }
 openclaw-sandbox = { path = "../sandbox", default-features = false }
 openclaw-inference = { path = "../inference" }
+openclaw-config = { path = "../config" }
+openclaw-assistant = { path = "../assistant" }
 openclaw-store = { path = "../store" }
 openclaw-storage = { path = "../storage" }
 openclaw-voice = { path = "../voice" }

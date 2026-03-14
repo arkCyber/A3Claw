@@ -1,9 +1,85 @@
+# Rust build artifacts
 /target
+**/*.rs.bk
+*.pdb
+
+# Cargo
 Cargo.lock
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor files
 *.swp
 *.swo
+*~
+.vscode/
+.idea/
+*.iml
+
+# Build outputs
 dist/
+build/
 *.tar.gz
 *.zip
+*.dmg
+*.deb
+*.rpm
+
+# WasmEdge runtime
 assets/wasmedge_quickjs.wasm
+models/gguf/*.gguf
+
+# Logs and databases
+logs/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# Configuration (keep examples)
+config.toml
+!config/default.toml
+
+# Test reports and temporary files
+*_REPORT*.txt
+*_REPORT*.md
+*_TEST*.txt
+*_SUMMARY*.md
+*_GUIDE*.md
+*_AUDIT*.md
+*.patch
+test_*.js
+test_*.rs
+test_*.toml
+test_*.md
+
+# Application bundles
+*.app/
+
+# Environment variables
+.env
+.env.local
+
+# Node.js (if bundling OpenClaw)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Registry and storage
+registry/
+storage/
+
+# Vendor directory
+vendor/
+
+# IDE-specific
+.vscode/settings.json
+.vscode/launch.json

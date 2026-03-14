@@ -1,0 +1,39 @@
+{
+  "_comment": "OpenClaw+ Community Skill Registry — add an entry here when submitting a community skill PR",
+  "version": "1",
+  "official": [
+    { "crate": "skill-hash",     "prefix": "hash",     "skills": 5,  "wasm": "skill_hash.wasm" },
+    { "crate": "skill-encode",   "prefix": "encode",   "skills": 6,  "wasm": "skill_encode.wasm" },
+    { "crate": "skill-math",     "prefix": "math",     "skills": 4,  "wasm": "skill_math.wasm" },
+    { "crate": "skill-text",     "prefix": "text",     "skills": 6,  "wasm": "skill_text.wasm" },
+    { "crate": "skill-datetime", "prefix": "datetime", "skills": 5,  "wasm": "skill_datetime.wasm" },
+    { "crate": "skill-crypto",   "prefix": "crypto",   "skills": 6,  "wasm": "skill_crypto.wasm" },
+    { "crate": "skill-uuid",     "prefix": "uuid",     "skills": 5,  "wasm": "skill_uuid.wasm" },
+    { "crate": "skill-compress", "prefix": "compress", "skills": 6,  "wasm": "skill_compress.wasm" },
+    { "crate": "skill-json",     "prefix": "json",     "skills": 8,  "wasm": "skill_json.wasm" },
+    { "crate": "skill-regex",    "prefix": "regex",    "skills": 6,  "wasm": "skill_regex.wasm" },
+    { "crate": "skill-network",  "prefix": "network",  "skills": 6,  "wasm": "skill_network.wasm" }
+  ],
+  "community": [
+    { "crate": "skill-string", "prefix": "string", "skills": 10, "wasm": "skill_string.wasm",
+      "description": "reverse, repeat, contains, starts_with, ends_with, char_count, lines, trim, indent, dedent" },
+    { "crate": "skill-number", "prefix": "number", "skills": 10, "wasm": "skill_number.wasm",
+      "description": "clamp, lerp, round_to, to_ordinal, to_roman, from_roman, fibonacci, factorial, is_prime, digits" },
+    { "crate": "skill-array",  "prefix": "array",  "skills": 10, "wasm": "skill_array.wasm",
+      "description": "length, unique, flatten, zip, chunk, sum, product, min, max, join" },
+    { "crate": "skill-color",  "prefix": "color",  "skills": 10, "wasm": "skill_color.wasm",
+      "description": "hex_to_rgb, rgb_to_hex, hex_to_hsl, hsl_to_hex, luminance, contrast_ratio, is_dark, blend, invert, color_name" },
+    { "crate": "skill-data",   "prefix": "data",   "skills": 10, "wasm": "skill_data.wasm",
+      "description": "csv_to_json, json_to_csv, tsv_to_json, ini_to_json, kv_to_json, json_to_table, json_schema, yaml_to_json_stub, xml_escape, html_escape" },
+    { "crate": "skill-geo",    "prefix": "geo",    "skills": 10, "wasm": "skill_geo.wasm",
+      "description": "haversine, bearing, midpoint, bounding_box, point_in_bbox, deg_to_dms, dms_to_deg, distance_to_meters, meters_to_degrees, grid_ref" },
+    { "crate": "skill-stat",   "prefix": "stat",   "skills": 10, "wasm": "skill_stat.wasm",
+      "description": "mean, median, mode, variance, stddev, percentile, zscore, correlation, normalize, histogram" },
+    { "crate": "skill-fmt",    "prefix": "fmt",    "skills": 10, "wasm": "skill_fmt.wasm",
+      "description": "pad_left, pad_right, truncate, wrap, slug, camel_to_snake, snake_to_camel, title_case, file_size, duration" },
+    { "crate": "skill-bits",   "prefix": "bits",   "skills": 10, "wasm": "skill_bits.wasm",
+      "description": "and, or, xor, not, shift_left, shift_right, popcount, to_binary, from_binary, to_hex" },
+    { "crate": "skill-token",  "prefix": "token",  "skills": 10, "wasm": "skill_token.wasm",
+      "description": "word_count, sentence_count, char_freq, top_words, ngrams, levenshtein, jaccard, longest_common_substr, word_wrap_words, is_pangram" }
+  ]
+}

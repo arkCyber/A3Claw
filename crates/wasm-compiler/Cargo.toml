@@ -1,0 +1,34 @@
+[package]
+name = "a3office-wasm-compiler"
+version.workspace = true
+edition.workspace = true
+description = "WASM compiler for OpenClaw skills"
+
+[dependencies]
+# WASM compilation
+wasmedge-sdk = { workspace = true }
+wasmedge-sys = { version = "0.19" }
+
+# Code generation
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Utilities
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+tempfile = "3.8"
+
+[dependencies.tempfile]
+version = "3.8"

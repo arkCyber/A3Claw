@@ -1,0 +1,20 @@
+[package]
+name = "skill-xml"
+version = "0.1.0"
+edition = "2021"
+description = "OpenClaw+ xml skill plugin — XML escaping, parsing, and generation (wasm32-wasip1)"
+
+[lib]
+crate-type = ["cdylib"]
+name = "skill_xml"
+
+[dependencies]
+openclaw-plugin-sdk = { path = "../../plugin-sdk" }
+serde_json = "1.0"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

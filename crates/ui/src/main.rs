@@ -1,9 +1,12 @@
 mod app;
+mod app_auto_test;
+mod assistant_tools;
 mod env_check;
 mod i18n;
 mod icons;
 mod ipc_client;
 mod pages;
+mod tooltip_helper;
 mod widgets;
 mod theme;
 

@@ -1,0 +1,33 @@
+[package]
+name = "a3office-wasm-runtime"
+version.workspace = true
+edition.workspace = true
+description = "WASM runtime for OpenClaw skills"
+
+[dependencies]
+# WASM execution
+wasmedge-sdk = { workspace = true }
+wasmedge-sys = { version = "0.19" }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Utilities
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+# Collections
+dashmap = "5.5"
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+tempfile = "3.8"

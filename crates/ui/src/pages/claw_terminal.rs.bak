@@ -1,0 +1,1021 @@
+use crate::app::{AppMessage, ClawEntry, ClawEntrySource, ClawEntryStatus};
+use crate::pages::ai_chat::EngineStatus;
+use crate::app::SandboxStatus;
+use crate::theme::Language;
+use cosmic::iced::{Alignment, Length};
+use cosmic::widget;
+use cosmic::Element;
+use crate::tooltip_helper::{with_tooltip_bubble_icon_arrow_i18n, TooltipPosition, TooltipTexts};
+
+/// Stable ID for the Claw Terminal input box.
+pub static CLAW_INPUT_ID: std::sync::LazyLock<cosmic::widget::Id> =
+    std::sync::LazyLock::new(cosmic::widget::Id::unique);
+
+/// Stable ID for the Claw Terminal history scrollable.
+pub static CLAW_SCROLL_ID: std::sync::LazyLock<cosmic::widget::Id> =
+    std::sync::LazyLock::new(cosmic::widget::Id::unique);
+
+pub struct ClawTerminalPage;
+
+impl ClawTerminalPage {
+    pub fn view<'a>(
+        lang: Language,
+        history: &'a [ClawEntry],
+        input: &'a str,
+        is_focused: bool,
+        sandbox_status: &'a SandboxStatus,
+        ai_status: &'a EngineStatus,
+        nl_mode: bool,
+        model_name: &'a str,
+        available_models: &'a [crate::app::OllamaModel],
+        gateway_url: Option<&'a str>,
+        gateway_reachable: bool,
+        tg_polling: bool,
+        tg_bot_username: Option<&'a str>,
+        _selected_agent_id: Option<&'a str>,
+        _agent_list: &'a [openclaw_security::AgentProfile],
+        attachment_name: Option<&'a str>,
+        recording: bool,
+        voice_status: Option<&'a str>,
+        auto_test_running: bool,
+        auto_test_steps_done: usize,
+    ) -> Element<'a, AppMessage> {
+        let color_muted   = cosmic::iced::Color::from_rgb(0.52, 0.50, 0.48);
+        let color_accent  = cosmic::iced::Color::from_rgb(0.28, 0.92, 0.78);
+        let color_success = cosmic::iced::Color::from_rgb(0.22, 0.82, 0.46);
+        let color_error   = cosmic::iced::Color::from_rgb(0.92, 0.28, 0.28);
+        let color_stderr  = cosmic::iced::Color::from_rgb(0.96, 0.62, 0.22);
+        let color_running = cosmic::iced::Color::from_rgb(0.96, 0.82, 0.22);
+        let color_nl      = cosmic::iced::Color::from_rgb(0.82, 0.52, 0.98);
+
+        // ── Status helpers ────────────────────────────────────────────────────
+        let sandbox_ok = matches!(sandbox_status, SandboxStatus::Running);
+        let _ai_ok = matches!(ai_status, EngineStatus::Ready | EngineStatus::Idle);
+
+        let status_dot = |ok: bool| -> Element<'a, AppMessage> {
+            let c = if ok { color_success } else { color_error };
+            widget::container(widget::Space::new(7, 7))
+                .style(move |_: &cosmic::Theme| {
+                    cosmic::iced::widget::container::Style {
+                        background: Some(cosmic::iced::Background::Color(c)),
+                        border: cosmic::iced::Border { radius: 4.0.into(), ..Default::default() },
+                        ..Default::default()
+                    }
+                })
+                .into()
+        };
+
+        // ── Header: single OpenClaw identity ─────────────────────────────────
+        let color_oc_brand = cosmic::iced::Color::from_rgb(0.28, 0.92, 0.78);
+
+        let header = widget::row::with_children(vec![
+            // OpenClaw avatar / icon
+            widget::container(
+                widget::text("⚡").size(20)
+            )
+            .into(),
+            widget::Space::new(10, 0).into(),
+            widget::column::with_children(vec![
+                widget::text("OpenClaw")
+                    .size(20).font(cosmic::font::bold())
+                    .class(cosmic::theme::Text::Color(color_oc_brand))
+                    .into(),
+                widget::text(
+                    crate::theme::t(lang, "Super AI Agent · Terminal", "超级智能体 · 终端")
+                )
+                .size(11)
+                .class(cosmic::theme::Text::Color(color_muted))
+                .into(),
+            ])
+            .spacing(1)
+            .into(),
+            widget::Space::new(Length::Fill, 0).into(),
+            // Status indicators
+            status_dot(sandbox_ok),
+            widget::text(crate::theme::t(lang, "Sandbox", "沙箱"))
+                .size(11).class(cosmic::theme::Text::Color(
+                    if sandbox_ok { color_success } else { color_error }
+                )).into(),
+            widget::Space::new(16, 0).into(),
+            // Model display (selection at bottom)
+            widget::text(format!("🤖 {}", model_name))
+                .size(11)
+                .class(cosmic::theme::Text::Color(color_accent))
+                .into(),
+            widget::Space::new(8, 0).into(),
+            // NL mode toggle
+            with_tooltip_bubble_icon_arrow_i18n(
+                widget::button::standard(
+                    if nl_mode {
+                        crate::theme::t(lang, "NL: ON", "NL: 开")
+                    } else {
+                        crate::theme::t(lang, "NL: OFF", "NL: 关")
+                    }
+                )
+                .on_press(AppMessage::ClawToggleNlMode)
+                .class(if nl_mode { cosmic::theme::Button::Suggested } else { cosmic::theme::Button::Standard }),
+                lang,
+                TooltipTexts::CLAW_NL_MODE.0,
+                TooltipTexts::CLAW_NL_MODE.1,
+                "🧠",
+                TooltipPosition::Bottom,
+            ),
+            widget::Space::new(8, 0).into(),
+            with_tooltip_bubble_icon_arrow_i18n(
+                widget::button::destructive(
+                    crate::theme::t(lang, "Clear", "清空")
+                )
+                .on_press(AppMessage::ClawClearHistory),
+                lang,
+                TooltipTexts::CLAW_CLEAR.0,
+                TooltipTexts::CLAW_CLEAR.1,
+                "🗑",
+                TooltipPosition::Bottom,
+            ),
+            widget::Space::new(8, 0).into(),
+            if auto_test_running {
+                widget::row::with_children(vec![
+                    widget::text(format!("🧪 {}/10", auto_test_steps_done))
+                        .size(12)
+                        .class(cosmic::theme::Text::Color(
+                            cosmic::iced::Color::from_rgb(0.96, 0.82, 0.22)
+                        ))
+                        .into(),
+                    widget::Space::new(6, 0).into(),
+                    widget::button::destructive(
+                        crate::theme::t(lang, "⏹ Stop", "⏹ 停止")
+                    )
+                    .on_press(AppMessage::ClawStopAutoTest)
+                    .into(),
+                ])
+                .spacing(4)
+                .align_y(Alignment::Center)
+                .into()
+            } else {
+                widget::button::standard(
+                    crate::theme::t(lang, "🧪 Auto Test", "🧪 自动测试")
+                )
+                .on_press(AppMessage::ClawRunAutoTest)
+                .into()
+            },
+            widget::Space::new(4, 0).into(),
+            widget::button::standard(
+                crate::theme::t(lang, "📄 Page Test", "📄 页面测试")
+            )
+            .on_press(AppMessage::RunPageAutoTest)
+            .into(),
+        ])
+        .spacing(6)
+        .align_y(Alignment::Center);
+
+        // ── Status bar (Gateway + Telegram) ────────────────────────────────────
+        let color_gw_ok  = cosmic::iced::Color::from_rgb(0.22, 0.82, 0.46);
+        let color_gw_off = cosmic::iced::Color::from_rgb(0.52, 0.50, 0.48);
+        let color_tg     = cosmic::iced::Color::from_rgb(0.28, 0.78, 0.96);
+        let gw_bar = widget::container(
+            widget::row::with_children(vec![
+                // Gateway indicator
+                widget::container(widget::Space::new(7, 7))
+                    .style(move |_: &cosmic::Theme| cosmic::iced::widget::container::Style {
+                        background: Some(cosmic::iced::Background::Color(
+                            if gateway_reachable { color_gw_ok } else { color_gw_off }
+                        )),
+                        border: cosmic::iced::Border { radius: 4.0.into(), ..Default::default() },
+                        ..Default::default()
+                    })
+                    .into(),
+                widget::Space::new(6, 0).into(),
+                widget::text(
+                    if gateway_reachable {
+                        crate::theme::t(lang, "Gateway: Connected", "Gateway: 已连接")
+                    } else {
+                        crate::theme::t(lang, "Gateway: Offline", "Gateway: 离线")
+                    }
+                )
+                .size(11)
+                .class(cosmic::theme::Text::Color(
+                    if gateway_reachable { color_gw_ok } else { color_gw_off }
+                ))
+                .into(),
+                widget::Space::new(8, 0).into(),
+                widget::text(gateway_url.unwrap_or("(set OPENCLAW_GATEWAY_URL)"))
+                    .size(10)
+                    .class(cosmic::theme::Text::Color(color_gw_off))
+                    .into(),
+                widget::Space::new(16, 0).into(),
+                // Telegram indicator
+                widget::container(widget::Space::new(7, 7))
+                    .style(move |_: &cosmic::Theme| cosmic::iced::widget::container::Style {
+                        background: Some(cosmic::iced::Background::Color(
+                            if tg_polling { color_tg } else { color_gw_off }
+                        )),
+                        border: cosmic::iced::Border { radius: 4.0.into(), ..Default::default() },
+                        ..Default::default()
+                    })
+                    .into(),
+                widget::Space::new(6, 0).into(),
+                widget::text(
+                    if tg_polling {
+                        if let Some(_u) = tg_bot_username {
+                            crate::theme::t(lang, "Telegram: polling", "Telegram: 轮询中")
+                        } else {
+                            crate::theme::t(lang, "Telegram: polling", "Telegram: 轮询中")
+                        }
+                    } else {
+                        crate::theme::t(lang, "Telegram: idle", "Telegram: 空闲")
+                    }
+                )
+                .size(11)
+                .class(cosmic::theme::Text::Color(if tg_polling { color_tg } else { color_gw_off }))
+                .into(),
+                widget::Space::new(Length::Fill, 0).into(),
+                // Action buttons
+                with_tooltip_bubble_icon_arrow_i18n(
+                    widget::button::standard(
+                        crate::theme::t(lang, "Gateway", "Gateway")
+                    )
+                    .on_press(AppMessage::ClawProbeGateway),
+                    lang,
+                    TooltipTexts::CLAW_GATEWAY.0,
+                    TooltipTexts::CLAW_GATEWAY.1,
+                    "🚪",
+                    TooltipPosition::Bottom,
+                ),
+                widget::Space::new(6, 0).into(),
+                with_tooltip_bubble_icon_arrow_i18n(
+                    widget::button::standard(
+                        if tg_polling {
+                            crate::theme::t(lang, "Stop TG", "停止TG")
+                        } else {
+                            crate::theme::t(lang, "Start TG", "开始TG")
+                        }
+                    )
+                    .on_press(if tg_polling { AppMessage::TgStopPolling } else { AppMessage::TgStartPolling })
+                    .class(if tg_polling { cosmic::theme::Button::Suggested } else { cosmic::theme::Button::Standard }),
+                    lang,
+                    TooltipTexts::CLAW_TELEGRAM.0,
+                    TooltipTexts::CLAW_TELEGRAM.1,
+                    "✈️",
+                    TooltipPosition::Bottom,
+                ),
+            ])
+            .spacing(4)
+            .align_y(Alignment::Center)
+            .padding([4, 12]),
+        )
+        .class(cosmic::theme::Container::Card)
+        .width(Length::Fill);
+
+        // ── NL mode hint bar ──────────────────────────────────────────────
+        let nl_hint = if nl_mode {
+            Some(
+                widget::container(
+                    widget::row::with_children(vec![
+                        widget::text("🧠").size(12).into(),
+                        widget::Space::new(6, 0).into(),
+                        widget::text(crate::theme::t(
+                            lang,
+                            "Natural Language Mode — describe what you want in plain language",
+                            "自然语言模式 — 用自然语言描述你的需求，OpenClaw 自动理解并执行",
+                        ))
+                        .size(11)
+                        .class(cosmic::theme::Text::Color(color_nl))
+                        .into(),
+                    ])
+                    .spacing(0)
+                    .align_y(Alignment::Center)
+                    .padding([6, 12]),
+                )
+                .style(move |_: &cosmic::Theme| {
+                    cosmic::iced::widget::container::Style {
+                        background: Some(cosmic::iced::Background::Color(
+                            cosmic::iced::Color::from_rgba(0.82, 0.52, 0.98, 0.08),
+                        )),
+                        border: cosmic::iced::Border {
+                            color: cosmic::iced::Color::from_rgba(0.82, 0.52, 0.98, 0.30),
+                            width: 1.0,
+                            radius: 6.0.into(),
+                        },
+                        ..Default::default()
+                    }
+                })
+                .width(Length::Fill)
+            )
+        } else {
+            None
+        };
+
+        // ── Conversation history ──────────────────────────────────────────────
+        let history_items: Vec<Element<AppMessage>> = if history.is_empty() {
+            vec![
+                widget::container(
+                    widget::column::with_children(vec![
+                        widget::text("⚡ OpenClaw").size(15).font(cosmic::font::bold())
+                            .class(cosmic::theme::Text::Color(color_oc_brand)).into(),
+                        widget::Space::new(0, 8).into(),
+                        widget::text(crate::theme::t(
+                            lang,
+                            "Hello! I'm OpenClaw, your super AI agent. How can I help you today?",
+                            "你好！我是 OpenClaw，你的超级 AI 智能体。今天有什么我可以帮你的吗？",
+                        ))
+                        .size(13)
+                        .class(cosmic::theme::Text::Color(
+                            cosmic::iced::Color::from_rgb(0.88, 0.98, 0.92)
+                        ))
+                        .width(Length::Fill)
+                        .into(),
+                        widget::Space::new(0, 12).into(),
+                        widget::text(crate::theme::t(
+                            lang,
+                            "You can talk to me via Telegram, Discord, and other channels — or right here in the terminal.",
+                            "你可以通过 Telegram、Discord 等渠道与我对话，也可以直接在这里输入。",
+                        ))
+                        .size(11)
+                        .class(cosmic::theme::Text::Color(color_muted))
+                        .width(Length::Fill)
+                        .into(),
+                    ])
+                    .spacing(0)
+                    .padding([20, 24]),
+                )
+                .class(cosmic::theme::Container::Card)
+                .width(Length::Fill)
+                .into(),
+            ]
+        } else {
+            history.iter().map(|entry| {
+                build_entry_card(entry, color_accent, color_success, color_error, color_stderr, color_running, color_muted)
+            }).collect()
+        };
+
+        // ── Input bar ─────────────────────────────────────────────────────────
+        let (prompt_sym, prompt_color, placeholder) = if nl_mode {
+            (
+                "🤖",
+                color_nl,
+                crate::theme::t(lang,
+                    "Describe what you want OpenClaw to do… (natural language)",
+                    "用自然语言描述你想让 OpenClaw 做什么…",
+                ),
+            )
+        } else {
+            (
+                "❯",
+                color_accent,
+                crate::theme::t(lang,
+                    "Type a command… (Enter = newline, Cmd+Enter = send/run, 'help' for list)",
+                    "输入命令… (Enter 换行，Cmd+Enter 发送/执行，'help' 查看列表)",
+                ),
+            )
+        };
+
+        let color_voice = if recording {
+            cosmic::iced::Color::from_rgb(0.92, 0.28, 0.28)
+        } else {
+            cosmic::iced::Color::from_rgb(0.72, 0.72, 0.72)
+        };
+        let color_img = cosmic::iced::Color::from_rgb(0.28, 0.72, 0.98);
+
+        // Attachment preview row (shown when image is attached or voice status active)
+        let has_attachment = attachment_name.is_some();
+        let has_voice_status = voice_status.is_some();
+
+        let mut input_col_children: Vec<Element<AppMessage>> = Vec::new();
+
+        // Attachment / voice status info bar
+        if has_attachment || has_voice_status {
+            let mut info_items: Vec<Element<AppMessage>> = Vec::new();
+            if let Some(name) = attachment_name {
+                info_items.push(
+                    widget::text(format!("📎 {}", name)).size(11)
+                        .class(cosmic::theme::Text::Color(color_img)).into()
+                );
+                info_items.push(widget::Space::new(8, 0).into());
+                info_items.push(
+                    widget::button::text("✕")
+                        .on_press(AppMessage::ClawClearAttachment)
+                        .class(cosmic::theme::Button::Destructive)
+                        .into()
+                );
+                info_items.push(widget::Space::new(16, 0).into());
+            }
+            if let Some(vs) = voice_status {
+                info_items.push(
+                    widget::text(vs).size(11)
+                        .class(cosmic::theme::Text::Color(color_voice)).into()
+                );
+            }
+            input_col_children.push(
+                widget::row::with_children(info_items)
+                    .spacing(0).align_y(Alignment::Center)
+                    .padding([4, 14, 0, 14])
+                    .into()
+            );
+        }
+
+        // Main input row
+        input_col_children.push(
+            widget::row::with_children(vec![
+                widget::text(prompt_sym)
+                    .size(16)
+                    .font(cosmic::font::bold())
+                    .class(cosmic::theme::Text::Color(prompt_color))
+                    .into(),
+                widget::Space::new(8, 0).into(),
+                widget::container(
+                    widget::text_input(placeholder, input)
+                        .id(CLAW_INPUT_ID.clone())
+                        .on_input(AppMessage::ClawInputChanged)
+                        .on_submit(|_| AppMessage::ClawSendCommand)
+                        .on_paste(AppMessage::ClawInputChanged)
+                        .on_focus(AppMessage::ClawInputFocused)
+                        .font(cosmic::font::mono())
+                        .size(13)
+                        .width(Length::Fill)
+                )
+                .style(move |_: &cosmic::Theme| {
+                    // 默认 1px 深灰，激活时 1px 浅蓝
+                    let border_color = if is_focused {
+                        cosmic::iced::Color::from_rgba(0.40, 0.72, 1.00, 0.90) // 浅蓝
+                    } else {
+                        cosmic::iced::Color::from_rgba(0.35, 0.35, 0.35, 0.80) // 深灰
+                    };
+                    cosmic::iced::widget::container::Style {
+                        border: cosmic::iced::Border {
+                            color: border_color,
+                            width: 1.0,
+                            radius: 4.0.into(),
+                        },
+                        ..Default::default()
+                    }
+                })
+                .width(Length::Fill)
+                .into(),
+                widget::Space::new(8, 0).into(),
+                // Voice button
+                with_tooltip_bubble_icon_arrow_i18n(
+                    widget::button::text(if recording { "⏹" } else { "🎙" })
+                        .on_press(if recording {
+                            AppMessage::ClawStopRecording
+                        } else {
+                            AppMessage::ClawStartRecording
+                        })
+                        .class(if recording {
+                            cosmic::theme::Button::Destructive
+                        } else {
+                            cosmic::theme::Button::Standard
+                        }),
+                    lang,
+                    TooltipTexts::CLAW_VOICE.0,
+                    TooltipTexts::CLAW_VOICE.1,
+                    "🎙️",
+                    TooltipPosition::Top,
+                ),
+                // Image button
+                with_tooltip_bubble_icon_arrow_i18n(
+                    widget::button::text(if has_attachment { "🖼✓" } else { "🖼" })
+                        .on_press(AppMessage::ClawPickImage)
+                        .class(if has_attachment {
+                            cosmic::theme::Button::Suggested
+                        } else {
+                            cosmic::theme::Button::Standard
+                        }),
+                    lang,
+                    TooltipTexts::CLAW_IMAGE.0,
+                    TooltipTexts::CLAW_IMAGE.1,
+                    "🖼️",
+                    TooltipPosition::Top,
+                ),
+                widget::Space::new(4, 0).into(),
+                with_tooltip_bubble_icon_arrow_i18n(
+                    widget::button::suggested(
+                        if nl_mode {
+                            crate::theme::t(lang, "Ask", "执行")
+                        } else {
+                            crate::theme::t(lang, "Run", "执行")
+                        }
+                    )
+                    .on_press(AppMessage::ClawSendCommand),
+                    lang,
+                    TooltipTexts::CLAW_SEND.0,
+                    TooltipTexts::CLAW_SEND.1,
+                    "▶️",
+                    TooltipPosition::Top,
+                ),
+            ])
+            .spacing(4)
+            .align_y(Alignment::Center)
+            .padding([10, 14])
+            .into()
+        );
+
+        let input_bar = widget::container(
+            widget::column::with_children(input_col_children).spacing(0),
+        )
+        .style(move |theme: &cosmic::Theme| {
+            cosmic::iced::widget::container::Style {
+                background: Some(cosmic::iced::Background::Color(
+                    theme.cosmic().background.base.into()
+                )),
+                border: cosmic::iced::Border {
+                    color: cosmic::iced::Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: 0.0.into(),
+                },
+                ..Default::default()
+            }
+        })
+        .width(Length::Fill);
+
+        // ── Fixed header region (does NOT scroll) ──────────────────────────
+        let mut fixed_children: Vec<Element<AppMessage>> = vec![
+            header.into(),
+            widget::Space::new(0, 6).into(),
+            gw_bar.into(),
+        ];
+        if let Some(hint) = nl_hint {
+            fixed_children.push(widget::Space::new(0, 6).into());
+            fixed_children.push(hint.into());
+        }
+        fixed_children.push(widget::Space::new(0, 4).into());
+
+        let fixed_header = widget::container(
+            widget::column::with_children(fixed_children).spacing(0),
+        )
+        .style(move |theme: &cosmic::Theme| {
+            cosmic::iced::widget::container::Style {
+                background: Some(cosmic::iced::Background::Color(
+                    theme.cosmic().background.base.into()
+                )),
+                border: cosmic::iced::Border {
+                    color: cosmic::iced::Color::from_rgba(1.0, 1.0, 1.0, 0.06),
+                    width: 0.0,
+                    radius: 0.0.into(),
+                },
+                ..Default::default()
+            }
+        })
+        .padding([16, 24, 8, 24])
+        .width(Length::Fill);
+
+        // ── Scrollable conversation area ──────────────────────────────────────
+        let mut history_col: Vec<Element<AppMessage>> = Vec::new();
+        history_col.extend(history_items);
+        history_col.push(widget::Space::new(0, 20).into());
+
+        let scrollable_content = widget::scrollable(
+            widget::column::with_children(history_col)
+                .spacing(8)
+                .padding([8, 24, 8, 24]),
+        )
+        .id(CLAW_SCROLL_ID.clone());
+
+        // Model selector chips at bottom
+        let model_chips = if !available_models.is_empty() {
+            widget::container(
+                widget::row::with_children(vec![
+                    widget::text(crate::theme::t(lang, "Model:", "模型:"))
+                        .size(11)
+                        .class(cosmic::theme::Text::Color(color_muted))
+                        .into(),
+                    widget::Space::new(8, 0).into(),
+                    widget::row::with_children(
+                        available_models.iter().map(|m| {
+                            widget::button::text(&m.name)
+                                .on_press(AppMessage::AiModelChanged(m.name.clone()))
+                                .class(if m.name == model_name {
+                                    cosmic::theme::Button::Suggested
+                                } else {
+                                    cosmic::theme::Button::Standard
+                                })
+                                .into()
+                        }).collect::<Vec<Element<AppMessage>>>()
+                    )
+                    .spacing(6)
+                    .into(),
+                ])
+                .spacing(0)
+                .align_y(Alignment::Center)
+            )
+            .padding([4, 24, 8, 24])
+            .width(Length::Fill)
+            .into()
+        } else {
+            widget::Space::new(0, 0).into()
+        };
+
+        widget::column::with_children(vec![
+            fixed_header.into(),
+            scrollable_content.height(Length::Fill).into(),
+            model_chips,
+            widget::container(input_bar)
+                .padding([0, 16, 12, 16])
+                .width(Length::Fill)
+                .into(),
+        ])
+        .height(Length::Fill)
+        .into()
+    }
+}
+
+fn build_entry_card<'a>(
+    entry: &'a ClawEntry,
+    color_accent: cosmic::iced::Color,
+    color_success: cosmic::iced::Color,
+    color_error: cosmic::iced::Color,
+    color_stderr: cosmic::iced::Color,
+    color_running: cosmic::iced::Color,
+    color_muted: cosmic::iced::Color,
+) -> Element<'a, AppMessage> {
+    match &entry.source {
+        ClawEntrySource::Telegram { from } => {
+            build_telegram_card(entry, from, color_muted)
+        }
+        ClawEntrySource::BotChannel { platform, from } => {
+            build_bot_channel_card(entry, platform, from, color_muted)
+        }
+        ClawEntrySource::OpenClaw => {
+            build_openclaw_card(entry, color_accent, color_success, color_error, color_muted)
+        }
+        ClawEntrySource::System => {
+            build_system_card(entry, color_muted)
+        }
+        ClawEntrySource::User => {
+            build_user_card(entry, color_accent, color_success, color_error,
+                color_stderr, color_running, color_muted)
+        }
+    }
+}
+
+/// Telegram message card.
+fn build_telegram_card<'a>(
+    entry: &'a ClawEntry,
+    from: &'a str,
+    color_muted: cosmic::iced::Color,
+) -> Element<'a, AppMessage> {
+    let color_tg = cosmic::iced::Color::from_rgb(0.28, 0.78, 0.96);
+    let color_text = cosmic::iced::Color::from_rgb(0.92, 0.92, 0.92);
+
+    let mut children: Vec<Element<AppMessage>> = vec![
+        // Header: badge + sender + platform label
+        widget::row::with_children(vec![
+            widget::text("✈ ").size(12).class(cosmic::theme::Text::Color(color_tg)).into(),
+            widget::text(format!("@{}", from)).size(12).font(cosmic::font::bold())
+                .class(cosmic::theme::Text::Color(color_tg)).into(),
+            widget::Space::new(Length::Fill, 0).into(),
+            widget::text("Telegram").size(10).class(cosmic::theme::Text::Color(color_muted)).into(),
+        ]).spacing(4).align_y(Alignment::Center).into(),
+        // Message text
+        widget::Space::new(0, 4).into(),
+        widget::text(&entry.command).size(13)
+            .class(cosmic::theme::Text::Color(color_text))
+            .width(Length::Fill).into(),
+    ];
+
+    // Metadata / output lines
+    for (line, _) in &entry.output_lines {
+        children.push(
+            widget::text(line.as_str()).size(10)
+                .class(cosmic::theme::Text::Color(color_muted))
+                .width(Length::Fill).into()
+        );
+    }
+
+    widget::container(
+        widget::column::with_children(children).spacing(0).padding([8, 12]),
+    )
+    .class(cosmic::theme::Container::Card)
+    .width(Length::Fill)
+    .into()
+}
+
+/// OpenClaw reply bubble — left-aligned chat style.
+fn build_openclaw_card<'a>(
+    entry: &'a ClawEntry,
+    _color_accent: cosmic::iced::Color,
+    _color_success: cosmic::iced::Color,
+    color_error: cosmic::iced::Color,
+    _color_muted: cosmic::iced::Color,
+) -> Element<'a, AppMessage> {
+    let color_oc      = cosmic::iced::Color::from_rgb(0.28, 0.92, 0.78);
+    let color_reply   = cosmic::iced::Color::from_rgb(0.88, 0.98, 0.92);
+    let color_time    = cosmic::iced::Color::from_rgb(0.45, 0.72, 0.58);
+    let color_running = cosmic::iced::Color::from_rgb(0.96, 0.82, 0.22);
+    let _color_muted_inner = cosmic::iced::Color::from_rgb(0.52, 0.50, 0.48);
+
+    let is_running = matches!(entry.status, ClawEntryStatus::Running);
+
+    // Animated spinner frames driven by system time (500ms tick)
+    let spinner_frame = if is_running {
+        let millis = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        (millis / 500) % 4  // 4 frames: 0,1,2,3
+    } else {
+        0
+    };
+    let spinner_dots = match spinner_frame {
+        0 => "⠋",
+        1 => "⠙",
+        2 => "⠸",
+        _ => "⠴",
+    };
+
+    // Sender label — show spinner when running
+    let sender_icon = if is_running {
+        widget::row::with_children(vec![
+            widget::text(spinner_dots).size(14)
+                .class(cosmic::theme::Text::Color(color_running)).into(),
+            widget::Space::new(4, 0).into(),
+            widget::text("OpenClaw").size(12).font(cosmic::font::bold())
+                .class(cosmic::theme::Text::Color(color_oc)).into(),
+            widget::Space::new(6, 0).into(),
+            widget::text("处理中…").size(11)
+                .class(cosmic::theme::Text::Color(color_running)).into(),
+        ])
+        .spacing(0).align_y(Alignment::Center).into()
+    } else {
+        widget::row::with_children(vec![
+            widget::text("⚡").size(12)
+                .class(cosmic::theme::Text::Color(color_oc)).into(),
+            widget::Space::new(4, 0).into(),
+            widget::text("OpenClaw").size(12).font(cosmic::font::bold())
+                .class(cosmic::theme::Text::Color(color_oc)).into(),
+        ])
+        .spacing(0).align_y(Alignment::Center).into()
+    };
+
+    let mut bubble_children: Vec<Element<AppMessage>> = vec![
+        sender_icon,
+        widget::Space::new(0, 6).into(),
+    ];
+
+    // Reply content lines
+    if !entry.output_lines.is_empty() {
+        for (line, is_err) in &entry.output_lines {
+            let c = if *is_err { color_error } else if is_running {
+                cosmic::iced::Color::from_rgb(0.85, 0.85, 0.75)
+            } else {
+                color_reply
+            };
+            bubble_children.push(
+                widget::text(line.as_str())
+                    .size(13)
+                    .class(cosmic::theme::Text::Color(c))
+                    .into()
+            );
+        }
+        // Animated trailing dots appended to last line when running
+        if is_running {
+            let trailing = match spinner_frame {
+                0 => "·",
+                1 => "··",
+                2 => "···",
+                _ => "",
+            };
+            if !trailing.is_empty() {
+                bubble_children.push(
+                    widget::text(trailing).size(13)
+                        .class(cosmic::theme::Text::Color(color_running))
+                        .into()
+                );
+            }
+        }
+    } else if is_running {
+        // No output lines yet — show animated waiting message
+        let dots = match spinner_frame {
+            0 => "·",
+            1 => "··",
+            2 => "···",
+            _ => "",
+        };
+        bubble_children.push(
+            widget::text(format!("ReAct 推理中{}", dots)).size(13)
+                .class(cosmic::theme::Text::Color(color_running))
+                .into()
+        );
+    } else {
+        bubble_children.push(
+            widget::text("(no output)").size(12)
+                .class(cosmic::theme::Text::Color(
+                    cosmic::iced::Color::from_rgb(0.45, 0.45, 0.45)
+                ))
+                .into()
+        );
+    }
+
+    // Latency badge
+    if let Some(ms) = entry.elapsed_ms {
+        let t = if ms < 1000 { format!("{ms}ms") } else { format!("{:.1}s", ms as f64 / 1000.0) };
+        bubble_children.push(widget::Space::new(0, 4).into());
+        bubble_children.push(
+            widget::text(format!("⏱ {t}")).size(10)
+                .class(cosmic::theme::Text::Color(color_time)).into()
+        );
+    }
+
+    // Border colour: animated amber when running, normal teal when done
+    let (bg_alpha, border_alpha, border_color) = if is_running {
+        (0.06, 0.35, color_running)
+    } else {
+        (0.08, 0.25, color_oc)
+    };
+
+    // Left-aligned bubble (content-width, shrink to fit)
+    widget::row::with_children(vec![
+        widget::container(
+            widget::column::with_children(bubble_children).spacing(2).padding([10, 14]),
+        )
+        .style(move |_: &cosmic::Theme| {
+            cosmic::iced::widget::container::Style {
+                background: Some(cosmic::iced::Background::Color(
+                    cosmic::iced::Color::from_rgba(
+                        border_color.r, border_color.g, border_color.b, bg_alpha
+                    ),
+                )),
+                border: cosmic::iced::Border {
+                    color: cosmic::iced::Color::from_rgba(
+                        border_color.r, border_color.g, border_color.b, border_alpha
+                    ),
+                    width: 1.0,
+                    radius: [4.0, 12.0, 12.0, 12.0].into(),
+                },
+                ..Default::default()
+            }
+        })
+        .width(Length::Shrink)
+        .max_width(760.0)
+        .into(),
+        widget::Space::new(Length::Fill, 0).into(),
+    ])
+    .spacing(0)
+    .width(Length::Fill)
+    .into()
+}
+
+/// Discord / Matrix / Slack message card.
+fn build_bot_channel_card<'a>(
+    entry: &'a ClawEntry,
+    platform: &'a str,
+    from: &'a str,
+    color_muted: cosmic::iced::Color,
+) -> Element<'a, AppMessage> {
+    let (color_label, icon) = match platform {
+        "Discord" => (cosmic::iced::Color::from_rgb(0.55, 0.62, 0.98), "🎮"),
+        "Matrix"  => (cosmic::iced::Color::from_rgb(0.20, 0.82, 0.62), "🔷"),
+        "Slack"   => (cosmic::iced::Color::from_rgb(0.98, 0.42, 0.58), "💬"),
+        _         => (cosmic::iced::Color::from_rgb(0.70, 0.70, 0.70), "📡"),
+    };
+    let color_text = cosmic::iced::Color::from_rgb(0.92, 0.92, 0.92);
+
+    let mut children: Vec<Element<AppMessage>> = vec![
+        // Header: icon + sender + platform
+        widget::row::with_children(vec![
+            widget::text(format!("{} ", icon)).size(12)
+                .class(cosmic::theme::Text::Color(color_label)).into(),
+            widget::text(from).size(12).font(cosmic::font::bold())
+                .class(cosmic::theme::Text::Color(color_label)).into(),
+            widget::Space::new(Length::Fill, 0).into(),
+            widget::text(platform).size(10)
+                .class(cosmic::theme::Text::Color(color_muted)).into(),
+        ]).spacing(4).align_y(Alignment::Center).into(),
+        // Message text
+        widget::Space::new(0, 4).into(),
+        widget::text(&entry.command).size(13)
+            .class(cosmic::theme::Text::Color(color_text))
+            .width(Length::Fill).into(),
+    ];
+
+    // Metadata / output lines
+    for (line, _) in &entry.output_lines {
+        children.push(
+            widget::text(line.as_str()).size(10)
+                .class(cosmic::theme::Text::Color(color_muted))
+                .width(Length::Fill).into()
+        );
+    }
+
+    widget::container(
+        widget::column::with_children(children).spacing(0).padding([8, 12]),
+    )
+    .class(cosmic::theme::Container::Card)
+    .width(Length::Fill)
+    .into()
+}
+
+/// System info card.
+fn build_system_card<'a>(
+    entry: &'a ClawEntry,
+    color_muted: cosmic::iced::Color,
+) -> Element<'a, AppMessage> {
+    let color_sys = cosmic::iced::Color::from_rgb(0.75, 0.72, 0.65);
+    let color_err = cosmic::iced::Color::from_rgb(0.92, 0.30, 0.30);
+
+    let mut children: Vec<Element<AppMessage>> = vec![
+        widget::row::with_children(vec![
+            widget::text("ℹ ").size(11).class(cosmic::theme::Text::Color(color_sys)).into(),
+            widget::text(&entry.command).size(12)
+                .class(cosmic::theme::Text::Color(color_sys))
+                .width(Length::Fill).into(),
+        ]).spacing(0).align_y(Alignment::Center).into(),
+    ];
+
+    for (line, is_err) in &entry.output_lines {
+        let c = if *is_err { color_err } else { color_muted };
+        children.push(
+            widget::text(line.as_str()).size(11)
+                .class(cosmic::theme::Text::Color(c))
+                .width(Length::Fill).into()
+        );
+    }
+
+    widget::container(
+        widget::column::with_children(children).spacing(3).padding([6, 12]),
+    )
+    .class(cosmic::theme::Container::Card)
+    .width(Length::Fill)
+    .into()
+}
+
+/// User message bubble — right-aligned chat style.
+fn build_user_card<'a>(
+    entry: &'a ClawEntry,
+    _color_accent: cosmic::iced::Color,
+    color_success: cosmic::iced::Color,
+    color_error: cosmic::iced::Color,
+    color_stderr: cosmic::iced::Color,
+    color_running: cosmic::iced::Color,
+    color_muted: cosmic::iced::Color,
+) -> Element<'a, AppMessage> {
+    let color_user_text = cosmic::iced::Color::from_rgb(0.95, 0.95, 0.95);
+    let _color_user_label = cosmic::iced::Color::from_rgb(0.72, 0.82, 0.98);
+
+    let (status_color, status_icon) = match &entry.status {
+        ClawEntryStatus::Running => (color_running, "⏳"),
+        ClawEntryStatus::Success => (color_success, "✓"),
+        ClawEntryStatus::Error(_) => (color_error,  "✗"),
+        ClawEntryStatus::Killed  => (color_muted,   "⊘"),
+    };
+
+    let elapsed_str = entry.elapsed_ms
+        .map(|ms| if ms < 1000 { format!(" · {}ms", ms) } else { format!(" · {:.1}s", ms as f64 / 1000.0) })
+        .unwrap_or_default();
+
+    // User message text
+    let mut bubble_children: Vec<Element<AppMessage>> = vec![
+        widget::text(&entry.command).size(13)
+            .class(cosmic::theme::Text::Color(color_user_text))
+            .into(),
+    ];
+    
+    // Status indicator at bottom if needed
+    if !elapsed_str.is_empty() || !matches!(entry.status, ClawEntryStatus::Success) {
+        bubble_children.push(widget::Space::new(0, 4).into());
+        bubble_children.push(
+            widget::text(format!("{}{}", status_icon, elapsed_str)).size(10)
+                .class(cosmic::theme::Text::Color(status_color)).into()
+        );
+    }
+
+    // Shell output lines (if any)
+    if !entry.output_lines.is_empty() {
+        bubble_children.push(widget::Space::new(0, 6).into());
+        for (line, is_stderr) in &entry.output_lines {
+            let color = if *is_stderr { color_stderr } else { cosmic::iced::Color::from_rgb(0.75, 0.78, 0.82) };
+            bubble_children.push(
+                widget::text(line.as_str()).size(11)
+                    .font(cosmic::font::mono())
+                    .class(cosmic::theme::Text::Color(color))
+                    .into()
+            );
+        }
+    }
+
+    // Right-aligned bubble (content-width, shrink to fit)
+    widget::row::with_children(vec![
+        widget::Space::new(Length::Fill, 0).into(),
+        widget::container(
+            widget::column::with_children(bubble_children).spacing(2).padding([10, 14]),
+        )
+        .style(move |_: &cosmic::Theme| {
+            cosmic::iced::widget::container::Style {
+                background: Some(cosmic::iced::Background::Color(
+                    cosmic::iced::Color::from_rgba(0.28, 0.52, 0.98, 0.15),
+                )),
+                border: cosmic::iced::Border {
+                    color: cosmic::iced::Color::from_rgba(0.48, 0.68, 0.98, 0.35),
+                    width: 1.0,
+                    radius: [12.0, 4.0, 12.0, 12.0].into(),
+                },
+                ..Default::default()
+            }
+        })
+        .width(Length::Shrink)
+        .max_width(500.0)
+        .into(),
+    ])
+    .spacing(0)
+    .width(Length::Fill)
+    .into()
+}

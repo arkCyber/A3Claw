@@ -1,0 +1,20 @@
+[package]
+name = "skill-random"
+version = "0.1.0"
+edition = "2021"
+description = "OpenClaw+ random skill plugin — random numbers, choices, shuffling (wasm32-wasip1)"
+
+[lib]
+crate-type = ["cdylib"]
+name = "skill_random"
+
+[dependencies]
+openclaw-plugin-sdk = { path = "../../plugin-sdk" }
+serde_json = "1.0"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

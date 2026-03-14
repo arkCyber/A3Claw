@@ -1,0 +1,12 @@
+[package]
+name = "skill-builder"
+version = "0.1.0"
+edition = "2021"
+description = "Build orchestrator: compiles all skill crates to wasm32-wasip1 and installs to ~/.openclaw/skills/"
+
+[lib]
+name = "skill_builder"
+
+[dependencies]
+
+[build-dependencies]

@@ -1,6 +1,12 @@
 # OpenClaw+ 🛡️
 
-> **OpenClaw Security Hardening Layer** — a dual-sandbox protection system built on WasmEdge + Rust + libcosmic.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
+[![WasmEdge](https://img.shields.io/badge/WasmEdge-0.14%2B-blue.svg)](https://wasmedge.org/)
+
+> **AI Agent Security Platform** — A comprehensive AI agent execution platform with WasmEdge sandbox, visual workflow editor, and enterprise-grade security controls.
+
+[English](README.md) | [中文](README_ZH.md)
 
 OpenClaw+ wraps OpenClaw in a WasmEdge WASI sandbox **without modifying a single line of OpenClaw's source code**, providing:
 
@@ -264,6 +270,25 @@ cargo test --features wasi-nn --test wasi_nn_integration
 - **Configuration**: TOML
 - **Distribution**: GitHub Actions + cargo-dist
 
-## License
+## 🤝 Contributing
 
-MIT
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+## 📧 Contact
+
+- **Author**: arksong2018@gmail.com
+- **Issues**: [GitHub Issues](https://github.com/arksong2018/openclaw-plus/issues)
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## 🙏 Acknowledgments
+
+- [WasmEdge](https://wasmedge.org/) - High-performance WebAssembly runtime
+- [libcosmic](https://github.com/pop-os/libcosmic) - Modern UI framework
+- [Rust](https://www.rust-lang.org/) - Systems programming language
+
+---
+
+**Built with ❤️ by the OpenClaw+ Team**

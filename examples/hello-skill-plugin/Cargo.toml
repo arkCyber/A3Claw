@@ -1,0 +1,17 @@
+[package]
+name = "hello-skill-plugin"
+version = "0.1.0"
+edition = "2021"
+description = "Example OpenClaw+ WASM skill plugin — greet and echo skills"
+
+[lib]
+crate-type = ["cdylib"]
+name = "hello_skill_plugin"
+
+[dependencies]
+openclaw-plugin-sdk = { path = "../../crates/plugin-sdk" }
+serde_json = "1"
+
+# Build for WASM:
+#   cargo build --target wasm32-wasip1 --release
+#   cp target/wasm32-wasip1/release/hello_skill_plugin.wasm ~/.openclaw/skills/

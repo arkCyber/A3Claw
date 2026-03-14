@@ -1,0 +1,682 @@
+//! Cron job storage and management.
+//!
+//! Provides persistent storage for cron jobs using SQLite.
+//! Supports storing, scheduling, and execution tracking of cron jobs.
+
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use sqlx::{query, query_as, Row, SqlitePool};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tracing::{debug, error, info, warn};
+
+/// Cron job structure with scheduling and execution metadata.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CronJob {
+    /// Unique job identifier.
+    pub id: String,
+    /// Human-readable job name.
+    pub name: String,
+    /// Cron expression (5-field: minute hour day month weekday).
+    pub schedule: String,
+    /// Agent goal or task to execute.
+    pub goal: String,
+    /// Whether the job is enabled.
+    pub enabled: bool,
+    /// Last execution timestamp (ISO string or null).
+    pub last_run: Option<String>,
+    /// Next scheduled execution timestamp (ISO string or null).
+    pub next_run: Option<String>,
+    /// Total execution count.
+    pub run_count: i64,
+    /// Creation timestamp.
+    pub created_at: String,
+    /// Last update timestamp.
+    pub updated_at: String,
+    /// Job metadata (optional).
+    pub metadata: Option<serde_json::Value>,
+}
+
+/// Cron job execution history entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CronExecution {
+    /// Unique execution identifier.
+    pub id: String,
+    /// Associated job identifier.
+    pub job_id: String,
+    /// Execution timestamp (ISO string).
+    pub executed_at: String,
+    /// Execution status (running, success, error).
+    pub status: String,
+    /// Execution result or error message.
+    pub result: Option<String>,
+    /// Execution duration in milliseconds.
+    pub duration_ms: Option<i64>,
+}
+
+/// Cron job statistics.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CronStats {
+    /// Total number of jobs.
+    pub total_jobs: u64,
+    /// Number of enabled jobs.
+    pub enabled_jobs: u64,
+    /// Number of disabled jobs.
+    pub disabled_jobs: u64,
+    /// Jobs that ran in the last 24 hours.
+    pub active_today: u64,
+    /// Jobs that failed in the last 24 hours.
+    pub failed_today: u64,
+    /// Total executions across all jobs.
+    pub total_executions: u64,
+}
+
+/// Persistent cron job storage.
+pub struct CronStore {
+    pool: SqlitePool,
+}
+
+impl CronStore {
+    /// Create a new cron store with database connection.
+    pub async fn new(pool: SqlitePool) -> Result<Self> {
+        let store = Self { pool };
+        store.init_tables().await?;
+        Ok(store)
+    }
+
+    /// Initialize database tables.
+    async fn init_tables(&self) -> Result<()> {
+        // Create cron_jobs table
+        query(
+            r#"
+            CREATE TABLE IF NOT EXISTS cron_jobs (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                schedule TEXT NOT NULL,
+                goal TEXT NOT NULL,
+                enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                last_run TEXT,
+                next_run TEXT,
+                run_count INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata TEXT
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Create cron_executions table
+        query(
+            r#"
+            CREATE TABLE IF NOT EXISTS cron_executions (
+                id TEXT PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                executed_at TEXT NOT NULL,
+                status TEXT NOT NULL,
+                result TEXT,
+                duration_ms INTEGER,
+                FOREIGN KEY (job_id) REFERENCES cron_jobs (id) ON DELETE CASCADE
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Create indexes for performance
+        query("CREATE INDEX IF NOT EXISTS idx_cron_jobs_enabled ON cron_jobs (enabled)")
+            .execute(&self.pool)
+            .await?;
+
+        query("CREATE INDEX IF NOT EXISTS idx_cron_jobs_next_run ON cron_jobs (next_run)")
+            .execute(&self.pool)
+            .await?;
+
+        query("CREATE INDEX IF NOT EXISTS idx_cron_executions_job_id ON cron_executions (job_id)")
+            .execute(&self.pool)
+            .await?;
+
+        query("CREATE INDEX IF NOT EXISTS idx_cron_executions_executed_at ON cron_executions (executed_at)")
+            .execute(&self.pool)
+            .await?;
+
+        info!("Cron database tables initialized");
+        Ok(())
+    }
+
+    /// Store a new cron job.
+    pub async fn store(&self, job: &CronJob) -> Result<()> {
+        query(
+            r#"
+            INSERT OR REPLACE INTO cron_jobs 
+            (id, name, schedule, goal, enabled, last_run, next_run, run_count, created_at, updated_at, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(&job.id)
+        .bind(&job.name)
+        .bind(&job.schedule)
+        .bind(&job.goal)
+        .bind(job.enabled)
+        .bind(&job.last_run)
+        .bind(&job.next_run)
+        .bind(job.run_count)
+        .bind(&job.created_at)
+        .bind(&job.updated_at)
+        .bind(job.metadata.as_ref().map(|v| v.to_string()))
+        .execute(&self.pool)
+        .await?;
+
+        debug!("Stored cron job: {}", job.id);
+        Ok(())
+    }
+
+    /// Get a cron job by ID.
+    pub async fn get(&self, job_id: &str) -> Result<Option<CronJob>> {
+        let row = query_as!(
+            CronJobRow,
+            r#"
+            SELECT id, name, schedule, goal, enabled, last_run, next_run, 
+                   run_count, created_at, updated_at, metadata
+            FROM cron_jobs WHERE id = ?
+            "#,
+            job_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|r| self.row_to_job(r)))
+    }
+
+    /// List all cron jobs.
+    pub async fn list(&self) -> Result<Vec<CronJob>> {
+        let rows = query_as!(
+            CronJobRow,
+            r#"
+            SELECT id, name, schedule, goal, enabled, last_run, next_run, 
+                   run_count, created_at, updated_at, metadata
+            FROM cron_jobs ORDER BY created_at DESC
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(|r| self.row_to_job(r)).collect())
+    }
+
+    /// List enabled cron jobs.
+    pub async fn list_enabled(&self) -> Result<Vec<CronJob>> {
+        let rows = query_as!(
+            CronJobRow,
+            r#"
+            SELECT id, name, schedule, goal, enabled, last_run, next_run, 
+                   run_count, created_at, updated_at, metadata
+            FROM cron_jobs WHERE enabled = TRUE ORDER BY next_run ASC
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(|r| self.row_to_job(r)).collect())
+    }
+
+    /// Update a cron job.
+    pub async fn update(&self, job_id: &str, updates: &CronJobUpdate) -> Result<bool> {
+        let now = iso_now();
+        
+        let mut query_builder = query("UPDATE cron_jobs SET updated_at = ?").bind(&now);
+        
+        if let Some(name) = &updates.name {
+            query_builder = query_builder.bind(", name = ?").bind(name);
+        }
+        if let Some(schedule) = &updates.schedule {
+            query_builder = query_builder.bind(", schedule = ?").bind(schedule);
+        }
+        if let Some(goal) = &updates.goal {
+            query_builder = query_builder.bind(", goal = ?").bind(goal);
+        }
+        if let Some(enabled) = updates.enabled {
+            query_builder = query_builder.bind(", enabled = ?").bind(enabled);
+        }
+        if let Some(next_run) = &updates.next_run {
+            query_builder = query_builder.bind(", next_run = ?").bind(next_run);
+        }
+        
+        let result = query_builder
+            .bind(", WHERE id = ?")
+            .bind(job_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Drop a cron job.
+    pub async fn delete(&self, job_id: &str) -> Result<bool> {
+        let result = query("DELETE FROM cron_jobs WHERE id = ?")
+            .bind(job_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Record job execution.
+    pub async fn record_execution(&self, execution: &CronExecution) -> Result<()> {
+        // Insert execution record
+        query(
+            r#"
+            INSERT INTO cron_executions 
+            (id, job_id, executed_at, status, result, duration_ms)
+            VALUES (?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(&execution.id)
+        .bind(&execution.job_id)
+        .bind(&execution.executed_at)
+        .bind(&execution.status)
+        .bind(&execution.result)
+        .bind(execution.duration_ms)
+        .execute(&self.pool)
+        .await?;
+
+        // Update job run count and last_run
+        query(
+            r#"
+            UPDATE cron_jobs 
+            SET run_count = run_count + 1, 
+                last_run = ?, 
+                updated_at = ?
+            WHERE id = ?
+            "#,
+        )
+        .bind(&execution.executed_at)
+        .bind(&execution.executed_at)
+        .bind(&execution.job_id)
+        .execute(&self.pool)
+        .await?;
+
+        debug!("Recorded execution for job: {}", execution.job_id);
+        Ok(())
+    }
+
+    /// Get execution history for a job.
+    pub async fn get_executions(&self, job_id: &str, limit: Option<i64>) -> Result<Vec<CronExecution>> {
+        let limit = limit.unwrap_or(50);
+        
+        let rows = query_as!(
+            CronExecutionRow,
+            r#"
+            SELECT id, job_id, executed_at, status, result, duration_ms
+            FROM cron_executions 
+            WHERE job_id = ? 
+            ORDER BY executed_at DESC 
+            LIMIT ?
+            "#,
+            job_id,
+            limit
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(|r| self.row_to_execution(r)).collect())
+    }
+
+    /// Get jobs that should run now.
+    pub async fn get_due_jobs(&self) -> Result<Vec<CronJob>> {
+        let now = iso_now();
+        
+        let rows = query_as!(
+            CronJobRow,
+            r#"
+            SELECT id, name, schedule, goal, enabled, last_run, next_run, 
+                   run_count, created_at, updated_at, metadata
+            FROM cron_jobs 
+            WHERE enabled = TRUE 
+              AND (next_run IS NULL OR next_run <= ?)
+            ORDER BY next_run ASC
+            "#,
+            now
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(|r| self.row_to_job(r)).collect())
+    }
+
+    /// Get cron statistics.
+    pub async fn get_stats(&self) -> Result<CronStats> {
+        let now = iso_now();
+        let yesterday = chrono::DateTime::parse_from_rfc3339(&now)
+            .unwrap_or_else(|_| chrono::DateTime::from_timestamp(0, 0).unwrap().into())
+            .checked_sub_signed(chrono::Duration::days(1))
+            .map(|dt| dt.to_rfc3339())
+            .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string());
+
+        let total_jobs: Option<i64> = query_scalar("SELECT COUNT(*) FROM cron_jobs")
+            .fetch_one(&self.pool)
+            .await?;
+
+        let enabled_jobs: Option<i64> = query_scalar("SELECT COUNT(*) FROM cron_jobs WHERE enabled = TRUE")
+            .fetch_one(&self.pool)
+            .await?;
+
+        let active_today: Option<i64> = query_scalar(
+            "SELECT COUNT(DISTINCT job_id) FROM cron_executions WHERE executed_at >= ?"
+        )
+        .bind(&yesterday)
+        .fetch_one(&self.pool)
+        .await?;
+
+        let failed_today: Option<i64> = query_scalar(
+            "SELECT COUNT(DISTINCT job_id) FROM cron_executions WHERE executed_at >= ? AND status = 'error'"
+        )
+        .bind(&yesterday)
+        .fetch_one(&self.pool)
+        .await?;
+
+        let total_executions: Option<i64> = query_scalar("SELECT SUM(run_count) FROM cron_jobs")
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(CronStats {
+            total_jobs: total_jobs.unwrap_or(0) as u64,
+            enabled_jobs: enabled_jobs.unwrap_or(0) as u64,
+            disabled_jobs: (total_jobs.unwrap_or(0) - enabled_jobs.unwrap_or(0)) as u64,
+            active_today: active_today.unwrap_or(0) as u64,
+            failed_today: failed_today.unwrap_or(0) as u64,
+            total_executions: total_executions.unwrap_or(0) as u64,
+        })
+    }
+
+    /// Clean up old execution records.
+    pub async fn cleanup_executions(&self, days_to_keep: i64) -> Result<u64> {
+        let cutoff = chrono::Utc::now()
+            .checked_sub_signed(chrono::Duration::days(days_to_keep))
+            .map(|dt| dt.to_rfc3339())
+            .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string());
+
+        let result = query("DELETE FROM cron_executions WHERE executed_at < ?")
+            .bind(&cutoff)
+            .execute(&self.pool)
+            .await?;
+
+        let deleted = result.rows_affected();
+        if deleted > 0 {
+            info!("Cleaned up {} old execution records", deleted);
+        }
+        
+        Ok(deleted)
+    }
+
+    // Helper methods
+
+    fn row_to_job(&self, row: CronJobRow) -> CronJob {
+        CronJob {
+            id: row.id,
+            name: row.name,
+            schedule: row.schedule,
+            goal: row.goal,
+            enabled: row.enabled,
+            last_run: row.last_run,
+            next_run: row.next_run,
+            run_count: row.run_count as u64,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            metadata: row.metadata.and_then(|s| serde_json::from_str(&s).ok()),
+        }
+    }
+
+    fn row_to_execution(&self, row: CronExecutionRow) -> CronExecution {
+        CronExecution {
+            id: row.id,
+            job_id: row.job_id,
+            executed_at: row.executed_at,
+            status: row.status,
+            result: row.result,
+            duration_ms: row.duration_ms.map(|d| d as u64),
+        }
+    }
+}
+
+/// Cron job update structure.
+#[derive(Debug, Default)]
+pub struct CronJobUpdate {
+    pub name: Option<String>,
+    pub schedule: Option<String>,
+    pub goal: Option<String>,
+    pub enabled: Option<bool>,
+    pub next_run: Option<String>,
+}
+
+// Database row structures for sqlx
+#[derive(sqlx::FromRow)]
+struct CronJobRow {
+    id: String,
+    name: String,
+    schedule: String,
+    goal: String,
+    enabled: bool,
+    last_run: Option<String>,
+    next_run: Option<String>,
+    run_count: i64,
+    created_at: String,
+    updated_at: String,
+    metadata: Option<String>,
+}
+
+#[derive(sqlx::FromRow)]
+struct CronExecutionRow {
+    id: String,
+    job_id: String,
+    executed_at: String,
+    status: String,
+    result: Option<String>,
+    duration_ms: Option<i64>,
+}
+
+/// Get current timestamp in ISO format.
+fn iso_now() -> String {
+    chrono::Utc::now().to_rfc3339()
+}
+
+/// Create a new cron job with default values.
+impl CronJob {
+    /// Create a new cron job.
+    pub fn new(id: String, name: String, schedule: String, goal: String) -> Self {
+        let now = chrono::Utc::now().to_rfc3339();
+        Self {
+            id,
+            name,
+            schedule,
+            goal,
+            enabled: true,
+            last_run: None,
+            next_run: None,
+            run_count: 0,
+            created_at: now.clone(),
+            updated_at: now,
+            metadata: None,
+        }
+    }
+
+    /// Create a new job with metadata.
+    pub fn with_metadata(mut self, metadata: serde_json::Value) -> Self {
+        self.metadata = Some(metadata);
+        self
+    }
+
+    /// Increment run count and update last run time.
+    pub fn mark_executed(&mut self) {
+        self.last_run = Some(chrono::Utc::now().to_rfc3339());
+        self.run_count += 1;
+        self.updated_at = chrono::Utc::now().to_rfc3339();
+    }
+}
+
+/// Create a new execution record.
+impl CronExecution {
+    pub fn new(job_id: String, status: String) -> Self {
+        Self {
+            id: format!("exec-{}-{}", job_id, chrono::Utc::now().timestamp_millis()),
+            job_id,
+            executed_at: iso_now(),
+            status,
+            result: None,
+            duration_ms: None,
+        }
+    }
+
+    /// Set execution result.
+    pub fn with_result(mut self, result: String) -> Self {
+        self.result = Some(result);
+        self
+    }
+
+    /// Set execution duration.
+    pub fn with_duration(mut self, duration_ms: u64) -> Self {
+        self.duration_ms = Some(duration_ms);
+        self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::SqlitePool;
+
+    async fn create_test_store() -> CronStore {
+        let pool = SqlitePool::connect(":memory:").await.unwrap();
+        CronStore::new(pool).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_store_and_retrieve_job() {
+        let store = create_test_store().await;
+        
+        let job = CronJob::new(
+            "test-job".to_string(),
+            "Test Job".to_string(),
+            "0 9 * * *".to_string(),
+            "Generate daily report".to_string(),
+        );
+        
+        store.store(&job).await.unwrap();
+        
+        let retrieved = store.get("test-job").await.unwrap();
+        assert!(retrieved.is_some());
+        let retrieved = retrieved.unwrap();
+        assert_eq!(retrieved.name, "Test Job");
+        assert_eq!(retrieved.schedule, "0 9 * * *");
+        assert_eq!(retrieved.goal, "Generate daily report");
+        assert!(retrieved.enabled);
+    }
+
+    #[tokio::test]
+    async fn test_list_jobs() {
+        let store = create_test_store().await;
+        
+        // Add many jobs
+        for i in 0..3 {
+            let job = CronJob::new(
+                format!("job-{}", i),
+                format!("Job {}", i),
+                format!("{} 9 * * *", i),
+                format!("Goal {}", i),
+            );
+            store.store(&job).await.unwrap();
+        }
+        
+        let jobs = store.list().await.unwrap();
+        assert_eq!(jobs.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_update_job() {
+        let store = create_test_store().await;
+        
+        let job = CronJob::new(
+            "test-job".to_string(),
+            "Test Job".to_string(),
+            "0 9 * * *".to_string(),
+            "Generate daily report".to_string(),
+        );
+        store.store(&job).await.unwrap();
+        
+        let updates = CronJobUpdate {
+            name: Some("Updated Job".to_string()),
+            enabled: Some(false),
+            ..Default::default()
+        };
+        
+        let updated = store.update("test-job", &updates).await.unwrap();
+        assert!(updated);
+        
+        let retrieved = store.get("test-job").await.unwrap().unwrap();
+        assert_eq!(retrieved.name, "Updated Job");
+        assert!(!retrieved.enabled);
+    }
+
+    #[tokio::test]
+    async fn test_record_execution() {
+        let store = create_test_store().await;
+        
+        let job = CronJob::new(
+            "test-job".to_string(),
+            "Test Job".to_string(),
+            "0 9 * * *".to_string(),
+            "Generate daily report".to_string(),
+        );
+        store.store(&job).await.unwrap();
+        
+        let execution = CronExecution::new("test-job".to_string(), "success".to_string())
+            .with_result("Report generated successfully".to_string())
+            .with_duration(1500);
+        
+        store.record_execution(&execution).await.unwrap();
+        
+        let executions = store.get_executions("test-job", Some(10)).await.unwrap();
+        assert_eq!(executions.len(), 1);
+        assert_eq!(executions[0].status, "success");
+        assert_eq!(executions[0].duration_ms, Some(1500));
+        
+        // Check job run count updated
+        let job = store.get("test-job").await.unwrap().unwrap();
+        assert_eq!(job.run_count, 1);
+        assert!(job.last_run.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_get_stats() {
+        let store = create_test_store().await;
+        
+        // Add jobs
+        let job1 = CronJob::new(
+            "job1".to_string(),
+            "Job 1".to_string(),
+            "0 9 * * *".to_string(),
+            "Goal 1".to_string(),
+        );
+        let job2 = CronJob::new(
+            "job2".to_string(),
+            "Job 2".to_string(),
+            "0 10 * * *".to_string(),
+            "Goal 2".to_string(),
+        );
+        
+        store.store(&job1).await.unwrap();
+        store.store(&job2).await.unwrap();
+        
+        // Disable one job
+        let updates = CronJobUpdate {
+            enabled: Some(false),
+            ..Default::default()
+        };
+        store.update("job2", &updates).await.unwrap();
+        
+        let stats = store.get_stats().await.unwrap();
+        assert_eq!(stats.total_jobs, 2);
+        assert_eq!(stats.enabled_jobs, 1);
+        assert_eq!(stats.disabled_jobs, 1);
+    }
+}
