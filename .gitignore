@@ -83,3 +83,4 @@ vendor/
 # IDE-specific
 .vscode/settings.json
 .vscode/launch.json
+*.gguf
