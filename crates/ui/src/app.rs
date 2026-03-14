@@ -7124,7 +7124,7 @@ impl OpenClawApp {
             (NavPage::Events,         crate::icons::event_log as IconFn,
              cosmic::iced::Color::from_rgb(0.38, 0.72, 0.98), "Event Log"),
             // 3 — AI Assistant
-            (NavPage::AiChat,         crate::icons::ai        as IconFn,
+            (NavPage::Assistant,       crate::icons::ai        as IconFn,
              cosmic::iced::Color::from_rgb(0.82, 0.52, 0.98), "AI Assistant"),
             // 4 — Claw Terminal
             (NavPage::ClawTerminal,   crate::icons::claw_term as IconFn,
