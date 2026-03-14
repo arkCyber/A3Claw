@@ -73,7 +73,7 @@ git tag -a v0.1.0 -m "Initial release v0.1.0"
 
 ```bash
 # 添加远程仓库
-git remote add origin https://github.com/arksong2018/openclaw-plus.git
+git remote add origin https://github.com/arkCyber/A3Claw.git
 
 # 推送主分支
 git push -u origin main
@@ -103,7 +103,7 @@ git push origin v0.1.0
 
 ### 1. 创建 Release
 
-1. 访问 https://github.com/arksong2018/openclaw-plus/releases/new
+1. 访问 https://github.com/arkCyber/A3Claw/releases/new
 2. 选择标签: `v0.1.0`
 3. Release 标题: `OpenClaw+ v0.1.0 - Initial Release`
 4. 描述模板：
@@ -141,7 +141,7 @@ git push origin v0.1.0
 curl -sSf https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install.sh | bash
 
 # 克隆仓库
-git clone https://github.com/arksong2018/openclaw-plus
+git clone https://github.com/arkCyber/A3Claw
 cd openclaw-plus
 
 # 构建
@@ -163,7 +163,7 @@ cargo run --release -p openclaw-ui
 
 ---
 
-**完整更新日志**: https://github.com/arksong2018/openclaw-plus/commits/v0.1.0
+**完整更新日志**: https://github.com/arkCyber/A3Claw/commits/v0.1.0
 ```
 
 ### 2. 上传构建产物
@@ -215,7 +215,7 @@ tar -czf openclaw-plus-macos-arm64.tar.gz -C target/release openclaw-plus
 
 ## 🔗 有用的链接
 
-- GitHub 仓库: https://github.com/arksong2018/openclaw-plus
-- Issues: https://github.com/arksong2018/openclaw-plus/issues
-- Discussions: https://github.com/arksong2018/openclaw-plus/discussions
+- GitHub 仓库: https://github.com/arkCyber/A3Claw
+- Issues: https://github.com/arkCyber/A3Claw/issues
+- Discussions: https://github.com/arkCyber/A3Claw/discussions
 - 作者邮箱: arksong2018@gmail.com

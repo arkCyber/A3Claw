@@ -90,7 +90,7 @@ sudo apt-get install -y libwayland-dev libxkbcommon-dev pkg-config cmake \
 ### 构建
 
 ```bash
-git clone https://github.com/arksong2018/openclaw-plus
+git clone https://github.com/arkCyber/A3Claw
 cd openclaw-plus
 
 # 构建所有 crate
@@ -249,8 +249,8 @@ cargo test --features wasi-nn --test wasi_nn_integration
 ## 📧 联系方式
 
 - **作者**: arksong2018@gmail.com
-- **问题反馈**: [GitHub Issues](https://github.com/arksong2018/openclaw-plus/issues)
-- **讨论**: [GitHub Discussions](https://github.com/arksong2018/openclaw-plus/discussions)
+- **问题反馈**: [GitHub Issues](https://github.com/arkCyber/A3Claw/issues)
+- **讨论**: [GitHub Discussions](https://github.com/arkCyber/A3Claw/discussions)
 
 ## 📄 许可证
 

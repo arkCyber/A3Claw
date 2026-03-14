@@ -124,7 +124,7 @@ sudo apt-get install -y libwayland-dev libxkbcommon-dev pkg-config cmake \
 ### Build
 
 ```bash
-git clone https://github.com/your-org/openclaw-plus
+git clone https://github.com/arkCyber/A3Claw
 cd openclaw-plus
 
 # Build all crates
@@ -277,7 +277,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 ## 📧 Contact
 
 - **Author**: arksong2018@gmail.com
-- **Issues**: [GitHub Issues](https://github.com/arksong2018/openclaw-plus/issues)
+- **Issues**: [GitHub Issues](https://github.com/arkCyber/A3Claw/issues)
 
 ## 📄 License
 

@@ -6,7 +6,7 @@
 - **版本**: v0.1.0
 - **作者**: arksong2018@gmail.com
 - **许可证**: MIT
-- **仓库**: https://github.com/arksong2018/openclaw-plus
+- **仓库**: https://github.com/arkCyber/A3Claw
 - **语言**: Rust 2021 Edition
 
 ## 🎯 项目定位
@@ -196,9 +196,9 @@ OpenClaw+/
 ## 📞 联系方式
 
 - **作者**: arksong2018@gmail.com
-- **GitHub**: https://github.com/arksong2018/openclaw-plus
-- **Issues**: https://github.com/arksong2018/openclaw-plus/issues
-- **Discussions**: https://github.com/arksong2018/openclaw-plus/discussions
+- **GitHub**: https://github.com/arkCyber/A3Claw
+- **Issues**: https://github.com/arkCyber/A3Claw/issues
+- **Discussions**: https://github.com/arkCyber/A3Claw/discussions
 
 ## 🙏 致谢
 

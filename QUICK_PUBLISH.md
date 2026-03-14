@@ -61,7 +61,7 @@ git tag -a v0.1.0 -m "Initial release v0.1.0"
 
 ```bash
 # Add remote
-git remote add origin https://github.com/arksong2018/openclaw-plus.git
+git remote add origin https://github.com/arkCyber/A3Claw.git
 
 # Push main branch
 git push -u origin main
@@ -72,7 +72,7 @@ git push origin v0.1.0
 
 ### Step 5: Create Release
 
-1. Go to https://github.com/arksong2018/openclaw-plus/releases/new
+1. Go to https://github.com/arkCyber/A3Claw/releases/new
 2. Choose tag: `v0.1.0`
 3. Release title: `OpenClaw+ v0.1.0 - Initial Release`
 4. Add release notes (see RELEASE_CHECKLIST.md for template)
@@ -91,7 +91,7 @@ git push origin v0.1.0
 
 ### Done! 🎉
 
-Your project is now live at: https://github.com/arksong2018/openclaw-plus
+Your project is now live at: https://github.com/arkCyber/A3Claw
 
 ---
 
@@ -152,7 +152,7 @@ git tag -a v0.1.0 -m "Initial release v0.1.0"
 
 ```bash
 # 添加远程仓库
-git remote add origin https://github.com/arksong2018/openclaw-plus.git
+git remote add origin https://github.com/arkCyber/A3Claw.git
 
 # 推送主分支
 git push -u origin main
@@ -163,7 +163,7 @@ git push origin v0.1.0
 
 ### 步骤 5: 创建发布版本
 
-1. 访问 https://github.com/arksong2018/openclaw-plus/releases/new
+1. 访问 https://github.com/arkCyber/A3Claw/releases/new
 2. 选择标签：`v0.1.0`
 3. 发布标题：`OpenClaw+ v0.1.0 - Initial Release`
 4. 添加发布说明（参见 RELEASE_CHECKLIST.md 中的模板）
@@ -182,7 +182,7 @@ git push origin v0.1.0
 
 ### 完成！🎉
 
-你的项目现已上线：https://github.com/arksong2018/openclaw-plus
+你的项目现已上线：https://github.com/arkCyber/A3Claw
 
 ---
 
@@ -190,4 +190,4 @@ git push origin v0.1.0
 
 - 📧 Email: arksong2018@gmail.com
 - 📖 详细清单: [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)
-- 🐛 问题反馈: [GitHub Issues](https://github.com/arksong2018/openclaw-plus/issues)
+- 🐛 问题反馈: [GitHub Issues](https://github.com/arkCyber/A3Claw/issues)

@@ -21,7 +21,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["arksong2018@gmail.com"]
 license = "MIT"
-repository = "https://github.com/arksong2018/openclaw-plus"
+repository = "https://github.com/arkCyber/A3Claw"
 
 [workspace.dependencies]
 # Async runtime

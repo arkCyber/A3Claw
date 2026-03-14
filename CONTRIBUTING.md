@@ -8,7 +8,7 @@ OpenClaw+ uses a plugin architecture where skills are compiled to `wasm32-wasip1
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/your-org/openclaw-plus
+git clone https://github.com/arkCyber/A3Claw
 cd openclaw-plus
 
 # 2. Install the wasm32-wasip1 target
@@ -76,7 +76,7 @@ crate-type = ["cdylib"]
 name = "skill_my_skill"
 
 [dependencies]
-openclaw-plugin-sdk = { git = "https://github.com/your-org/openclaw-plus", package = "openclaw-plugin-sdk" }
+openclaw-plugin-sdk = { git = "https://github.com/arkCyber/A3Claw", package = "openclaw-plugin-sdk" }
 serde_json = "1.0"
 
 [profile.release]
