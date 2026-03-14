@@ -1,5 +1,4 @@
 /target
-Cargo.lock
 .DS_Store
 *.swp
 *.swo
@@ -7,3 +6,25 @@ dist/
 *.tar.gz
 *.zip
 assets/wasmedge_quickjs.wasm
+
+# Logs
+logs/
+*.log
+
+# Models (too large for git)
+models/
+llama-server
+
+# Temporary files
+*.bak
+*.backup
+*.tmp
+pont
+pu
+
+# Test reports (keep in docs/reports)
+*_REPORT_*.txt
+test_report_*.txt
+
+# Environment
+.env

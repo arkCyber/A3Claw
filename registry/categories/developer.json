@@ -1,0 +1,53 @@
+{
+  "category": "developer",
+  "page": 0,
+  "total_pages": 12,
+  "plugins": [
+    {
+      "id": "dev.clawplus.search",
+      "name": "ClawPlus Fast Search",
+      "description": "Ripgrep-powered code and file search with sub-10ms query times.",
+      "version": "0.2.0",
+      "author": "ClawPlus Contributors",
+      "license": "MIT",
+      "category": "developer",
+      "language": "rust",
+      "downloads": 2100,
+      "rating": 4.8,
+      "rating_count": 127,
+      "icon_url": "https://registry.clawplus.dev/icons/search.svg",
+      "tags": ["search", "indexing", "performance"]
+    },
+    {
+      "id": "com.example.typescript-linter",
+      "name": "TypeScript Linter",
+      "description": "Fast TypeScript/JavaScript linting via ESLint compiled to WASM.",
+      "version": "1.0.3",
+      "author": "DevTools Community",
+      "license": "MIT",
+      "category": "developer",
+      "language": "type_script",
+      "downloads": 8920,
+      "rating": 4.6,
+      "rating_count": 412,
+      "icon_url": "https://registry.clawplus.dev/icons/ts-linter.svg",
+      "tags": ["typescript", "javascript", "linting", "eslint"]
+    },
+    {
+      "id": "io.github.python-formatter",
+      "name": "Python Black Formatter",
+      "description": "Python code formatter (Black) running in WASM sandbox.",
+      "version": "2.1.0",
+      "author": "Python Tools",
+      "license": "MIT",
+      "category": "developer",
+      "language": "python",
+      "downloads": 5670,
+      "rating": 4.7,
+      "rating_count": 289,
+      "icon_url": "https://registry.clawplus.dev/icons/py-black.svg",
+      "tags": ["python", "formatting", "black"]
+    }
+  ],
+  "next_page_url": "file://registry/categories/developer-page-1.json"
+}

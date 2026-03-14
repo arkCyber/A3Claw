@@ -1,0 +1,22 @@
+[package]
+name = "openclaw-assistant"
+version = "0.1.0"
+edition = "2021"
+description = "AI Assistant for OpenClaw+ configuration and troubleshooting"
+license = "MIT"
+authors = ["OpenClaw+ Team"]
+
+[dependencies]
+openclaw-config = { path = "../config" }
+openclaw-security = { path = "../security" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+thiserror = "1.0"
+tracing = "0.1"
+regex = "1.10"
+
+[dev-dependencies]
+tokio-test = "0.4"
+pretty_assertions = "1.0"
+tempfile = "3.0"

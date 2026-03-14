@@ -1,0 +1,20 @@
+[package]
+name = "skill-path"
+version = "0.1.0"
+edition = "2021"
+description = "OpenClaw+ path skill plugin — file path manipulation (wasm32-wasip1)"
+
+[lib]
+crate-type = ["cdylib"]
+name = "skill_path"
+
+[dependencies]
+openclaw-plugin-sdk = { path = "../../plugin-sdk" }
+serde_json = "1.0"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

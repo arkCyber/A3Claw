@@ -2,7 +2,9 @@
 members = [
     "crates/sandbox",
     "crates/security",
+    "crates/config",
     "crates/storage",
+    "crates/assistant",
     "crates/ui",
     "crates/plugin",
     "crates/store",

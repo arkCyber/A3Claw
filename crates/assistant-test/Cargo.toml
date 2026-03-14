@@ -1,0 +1,17 @@
+[package]
+name = "assistant-test"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "assistant-test"
+path = "src/main.rs"
+
+[dependencies]
+openclaw-assistant = { path = "../assistant" }
+openclaw-config = { path = "../config" }
+openclaw-security = { path = "../security" }
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+anyhow = "1.0"

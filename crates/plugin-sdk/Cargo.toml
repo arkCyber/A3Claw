@@ -1,0 +1,17 @@
+[package]
+name = "openclaw-plugin-sdk"
+version.workspace = true
+edition.workspace = true
+description = "Guest-side SDK for writing OpenClaw+ WASM skill plugins (target: wasm32-wasip1)"
+
+# This crate is intended for use as a dependency by plugin authors.
+# It compiles to wasm32-wasip1; no std features that require OS are used.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde      = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

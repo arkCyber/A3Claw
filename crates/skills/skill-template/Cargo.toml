@@ -1,0 +1,21 @@
+[package]
+name = "skill-template"
+version = "0.1.0"
+edition = "2021"
+description = "Community skill plugin template for OpenClaw+ — copy this to start a new skill crate"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+name = "skill_template"
+
+[dependencies]
+openclaw-plugin-sdk = { path = "../../plugin-sdk" }
+serde_json = "1.0"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

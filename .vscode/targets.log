@@ -7,7 +7,7 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 
 # This program built for i386-apple-darwin11.3.0
 
-# Make data base, printed on Wed Feb 25 21:34:13 2026
+# Make data base, printed on Fri Mar 13 14:21:50 2026
 
 # Variables
 
@@ -35,6 +35,8 @@ SHELL = /bin/sh
 VSCODE_NLS_CONFIG = {"userLocale":"zh-cn","osLocale":"zh-cn","resolvedLanguage":"en","defaultMessagesFile":"/Applications/Windsurf.app/Contents/Resources/app/out/nls.messages.json","locale":"zh-cn","availableLanguages":{}}
 # environment
 _ = /usr/bin/make
+# environment
+WALLABY_PRODUCTION = true
 # makefile (from `Makefile', line 1)
 MAKEFILE_LIST :=  Makefile
 # makefile (from `Makefile', line 54)
@@ -50,9 +52,9 @@ STORE := target/release/openclaw-store
 # makefile (from `Makefile', line 59)
 APP_BUNDLE := /tmp/OpenClawStore.app
 # environment
-PATH = /Users/arkSong/.codeium/windsurf/bin:/Users/arkSong/Library/pnpm:/Users/arkSong/.bun/bin:/opt/homebrew/opt/llvm/bin:/usr/local/opt/llvm/bin:/Users/arkSong/.nvm/versions/node/v22.13.1/bin:/opt/homebrew/opt/libiconv/bin:/Users/arkSong/miniconda3/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/opt/podman/bin:/Library/Apple/usr/bin:/Users/arkSong/.cargo/bin:/Users/arkSong/.wasmedge/bin:/Users/arkSong/Library/Application Support/JetBrains/Toolbox/scripts:/Users/arkSong/.local/bin:/Users/arkSong/.lmstudio/bin:/Users/arkSong/.local/bin:/Applications/Docker.app/Contents/Resources/bin
+PATH = /Users/arkSong/.codeium/windsurf/bin:/Users/arkSong/Library/pnpm:/Users/arkSong/.bun/bin:/opt/homebrew/opt/llvm/bin:/usr/local/opt/llvm/bin:/Users/arkSong/.nvm/versions/node/v22.13.1/bin:/opt/homebrew/opt/libiconv/bin:/Users/arkSong/miniconda3/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pmk/env/global/bin:/opt/X11/bin:/Library/Apple/usr/bin:/opt/podman/bin:/Users/arkSong/.cargo/bin:/Users/arkSong/.wasmedge/bin:/Users/arkSong/Library/Application Support/JetBrains/Toolbox/scripts:/Users/arkSong/.local/bin:/Users/arkSong/.lmstudio/bin:/Users/arkSong/.local/bin:/Applications/Docker.app/Contents/Resources/bin
 # environment
-LOG_DST = /Users/arkSong/Library/Application Support/Windsurf/logs/20260225T213401/window1/exthost/dendron.dendron/dendron.log
+LOG_DST = /Users/arkSong/Library/Application Support/Windsurf/logs/20260313T142052/window1/exthost/dendron.dendron/dendron.log
 # environment
 C_INCLUDE_PATH = /Users/arkSong/.wasmedge/include
 # environment
@@ -64,33 +66,37 @@ NVM_BIN = /Users/arkSong/.nvm/versions/node/v22.13.1/bin
 # environment
 LOG_LEVEL = info
 # environment
+LaunchInstanceID = C7B35556-3E90-4157-9D2E-5D45A8D50D4E
+# environment
 ELECTRON_RUN_AS_NODE = 1
 # makefile (from `Makefile', line 24)
 PORT := 54321
 # default
 .FEATURES := target-specific order-only second-expansion else-if archives jobserver check-symlink
 # environment
-SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.W3qyuQGg0X/Listeners
+SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.6JG4Pzudif/Listeners
 # environment
 CPLUS_INCLUDE_PATH = /Users/arkSong/.wasmedge/include
 # automatic
 %F = $(notdir $%)
 # environment
-DISPLAY = /private/tmp/com.apple.launchd.bt5DHMXjCN/org.xquartz:0
+DISPLAY = /private/tmp/com.apple.launchd.RVHT4G3g9c/org.xquartz:0
 # environment
 PWD = /Users/arkSong/workspace/OpenClaw+
 # environment
 HOMEBREW_CELLAR = /opt/homebrew/Cellar
 # environment
+OSLogRateLimit = 64
+# environment
 HOME = /Users/arkSong
 # default
 MAKEFILEPATH := /Applications/Xcode.app/Contents/Developer/Makefiles
 # environment
-VSCODE_CODE_CACHE_PATH = /Users/arkSong/Library/Application Support/Windsurf/CachedData/2a329a0a513ed199397a4f9ebb1c8267575a7ef0
+VSCODE_CODE_CACHE_PATH = /Users/arkSong/Library/Application Support/Windsurf/CachedData/73ca2d6aa880de1bc504ad960c1ab79c9248d476
 # environment
 LOGNAME = zhiliangyang
 # environment
-APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = true
+APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = 1
 # environment
 NVM_CD_FLAGS = -q
 # environment
@@ -144,11 +150,13 @@ MFLAGS = -Rrqp
 # environment
 NVM_DIR = /Users/arkSong/.nvm
 # environment
-XPC_SERVICE_NAME = application.com.exafunction.windsurf.169483106.169483112
+XPC_SERVICE_NAME = application.com.exafunction.windsurf.174908524.174908530
 # environment
 HOMEBREW_PREFIX = /opt/homebrew
 # automatic
 +D = $(patsubst %/,%,$(dir $+))
+# environment
+VSCODE_L10N_BUNDLE_LOCATION = 
 # automatic
 +F = $(notdir $+)
 # environment
@@ -165,6 +173,8 @@ DETECTED_OS := macos
 <F = $(notdir $<)
 # environment
 LC_ALL = C
+# environment
+SECURITYSESSIONID = 186b8
 # automatic
 ^F = $(notdir $^)
 # default
@@ -180,9 +190,9 @@ LANG = C
 # makefile (from `Makefile', line 25)
 REGISTRY := /Users/arkSong/workspace/OpenClaw+/registry/index.json
 # environment
-VSCODE_PID = 35399
+VSCODE_PID = 721
 # variable set hash-table stats:
-# Load=85/1024=8%, Rehash=0, Collisions=2/119=2%
+# Load=90/1024=9%, Rehash=0, Collisions=2/124=2%
 
 # Pattern-specific Variable Values
 
@@ -190,9 +200,9 @@ VSCODE_PID = 35399
 
 # Directories
 
-# . (device 16777231, inode 167318641): 25 files, no impossibilities.
+# . (device 16777233, inode 172390459): 133 files, no impossibilities.
 
-# 25 files, no impossibilities in 1 directories.
+# 133 files, no impossibilities in 1 directories.
 
 # Implicit Rules
 
@@ -439,7 +449,7 @@ check:
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
 
-# Finished Make data base on Wed Feb 25 21:34:13 2026
+# Finished Make data base on Fri Mar 13 14:21:50 2026
 
  
 make: *** No rule to make target `all'.  Stop.

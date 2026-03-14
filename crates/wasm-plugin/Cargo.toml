@@ -1,0 +1,38 @@
+[package]
+name = "openclaw-wasm-plugin"
+version.workspace = true
+edition.workspace = true
+description = "WASM plugin loader and host-side executor for OpenClaw+ skill extensions"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# WasmEdge (optional — skipped when `runtime` feature is off)
+wasmedge-sdk = { workspace = true, optional = true }
+wasmedge-sys = { version = "0.19", optional = true }
+wasmedge-types = { version = "0.6", optional = true }
+
+# Reqwest for host HTTP helper exposed to plugins
+reqwest = { version = "0.12", features = [
+    "json",
+    "rustls-tls",
+], default-features = false, optional = true }
+
+dirs = { workspace = true }
+
+# SHA-2 for plugin integrity verification
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+[features]
+default = ["runtime"]
+runtime = ["wasmedge-sdk", "wasmedge-sys", "wasmedge-types", "reqwest"]
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { workspace = true, features = ["rt", "macros"] }
