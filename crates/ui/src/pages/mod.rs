@@ -7,6 +7,8 @@ pub mod events;
 pub mod settings;
 pub mod confirm;
 pub mod general_settings;
-
+pub mod skills;
+#[cfg(test)]
+mod skills_test;
 #[path = "claw_terminal.rs.bak"]
 pub mod claw_terminal;

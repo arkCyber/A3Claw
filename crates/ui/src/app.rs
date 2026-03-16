@@ -133,6 +133,8 @@ pub enum NavPage {
     AuditReplay,
     /// AI Assistant for system maintenance and diagnostics.
     Assistant,
+    /// Skills Browser — browse and search all 310+ built-in skills.
+    Skills,
 }
 
 /// Application-wide messages dispatched by the libcosmic runtime.
@@ -562,6 +564,15 @@ pub enum AppMessage {
     ShowLanguageMenu,
     /// Hide the language selection popup menu.
     HideLanguageMenu,
+    // ── Skills Browser messages ────────────────────────────────────────────
+    /// Skills search query changed.
+    SkillSearchChanged(String),
+    /// Skills category filter selected (None = All).
+    SkillCategorySelected(Option<String>),
+    /// User selected a skill to view details.
+    SkillSelected(String),
+    /// Execute the selected skill in Claw Terminal.
+    SkillExecuteInTerminal(String),
     // ── Environment check messages ─────────────────────────────────────────
     /// Startup: run full environment health check.
     EnvCheckStart,
@@ -1071,6 +1082,15 @@ pub struct OpenClawApp {
     env_check_visible: bool,
     /// Accumulated environment check report.
     env_check_report: crate::env_check::EnvCheckReport,
+    // ── Skills Browser state ──────────────────────────────────────────────
+    /// All available skills (loaded from agent-executor).
+    skills_list: Vec<crate::pages::skills::SkillInfo>,
+    /// Skills search query.
+    skills_search: String,
+    /// Selected category filter (None = All).
+    skills_category: Option<String>,
+    /// Currently selected skill name.
+    skills_selected: Option<String>,
 }
 
 /// Aggregate statistics derived from sandbox events, displayed on the dashboard.
@@ -1325,6 +1345,11 @@ impl cosmic::Application for OpenClawApp {
             assistant_show_settings: false,
             env_check_visible: true,
             env_check_report: crate::env_check::EnvCheckReport::new(),
+            // Initialize Skills Browser state
+            skills_list: Self::load_builtin_skills(),
+            skills_search: String::new(),
+            skills_category: None,
+            skills_selected: None,
         };
         app.core.window.header_title = "OpenClawPlus - AI Agent Platform".into();
 
@@ -1630,6 +1655,13 @@ impl cosmic::Application for OpenClawApp {
             NavPage::PluginStore => self.view_plugin_store(lang),
             NavPage::Agents => self.view_agents_page(lang),
             NavPage::AuditReplay => self.view_audit_page(lang),
+            NavPage::Skills => crate::pages::skills::SkillsPage::view(
+                &self.skills_list,
+                &self.skills_search,
+                self.skills_category.as_deref(),
+                self.skills_selected.as_deref(),
+                lang,
+            ),
         };
 
         // ── Left sidebar + right content ───────────────────────────────────
@@ -3286,6 +3318,21 @@ impl cosmic::Application for OpenClawApp {
             }
             AppMessage::HideLanguageMenu => {
                 self.show_language_menu = false;
+            }
+            // ── Skills Browser ─────────────────────────────────────────────
+            AppMessage::SkillSearchChanged(query) => {
+                self.skills_search = query;
+            }
+            AppMessage::SkillCategorySelected(category) => {
+                self.skills_category = category;
+            }
+            AppMessage::SkillSelected(name) => {
+                self.skills_selected = Some(name);
+            }
+            AppMessage::SkillExecuteInTerminal(skill_name) => {
+                self.nav_page = NavPage::ClawTerminal;
+                self.claw_input = format!("skill {}", skill_name);
+                self.claw_input_focused = true;
             }
             AppMessage::ToggleTheme => {
                 self.warm_theme_active = !self.warm_theme_active;
@@ -5160,6 +5207,42 @@ fn provider_to_backend_kind(provider: &AiProvider) -> BackendKind {
 }
 
 impl OpenClawApp {
+    /// Load all built-in skills from agent-executor.
+    /// Converts agent-executor's Skill definitions to UI's SkillInfo format.
+    fn load_builtin_skills() -> Vec<crate::pages::skills::SkillInfo> {
+        use openclaw_agent_executor::skill::{BUILTIN_SKILLS, SkillRisk as AgentSkillRisk};
+        
+        BUILTIN_SKILLS
+            .iter()
+            .map(|skill| {
+                let risk_level = match skill.risk {
+                    AgentSkillRisk::Safe => crate::pages::skills::SkillRisk::Safe,
+                    AgentSkillRisk::Confirm => crate::pages::skills::SkillRisk::Confirm,
+                    AgentSkillRisk::Deny => crate::pages::skills::SkillRisk::Deny,
+                };
+                
+                let parameters = skill.params
+                    .iter()
+                    .map(|p| crate::pages::skills::SkillParam {
+                        name: p.name.to_string(),
+                        param_type: p.param_type.to_string(),
+                        required: p.required,
+                        description: p.description.to_string(),
+                    })
+                    .collect();
+                
+                crate::pages::skills::SkillInfo {
+                    name: skill.name.to_string(),
+                    display_name: skill.display.to_string(),
+                    description: skill.description.to_string(),
+                    category: skill.category.to_string(),
+                    risk_level,
+                    parameters,
+                }
+            })
+            .collect()
+    }
+    
     /// Save all application state to disk before quitting.
     /// This includes: SecurityConfig, AI chat history, Claw Terminal history, and UI preferences.
     /// Aerospace-grade: comprehensive error handling, atomic writes, and detailed logging.
@@ -7257,16 +7340,19 @@ impl OpenClawApp {
             // 4 — Claw Terminal
             (NavPage::ClawTerminal,   crate::icons::claw_term as IconFn,
              cosmic::iced::Color::from_rgb(0.28, 0.92, 0.78), "Claw Terminal"),
-            // 5 — Digital Workers
+            // 5 — Skills Browser
+            (NavPage::Skills,         crate::icons::home      as IconFn,
+             cosmic::iced::Color::from_rgb(0.52, 0.82, 0.98), "Skills Browser"),
+            // 6 — Digital Workers
             (NavPage::Agents,         crate::icons::home      as IconFn,
              cosmic::iced::Color::from_rgb(0.98, 0.55, 0.35), "Digital Workers"),
-            // 6 — Audit Replay
+            // 7 — Audit Replay
             (NavPage::AuditReplay,    crate::icons::event_log as IconFn,
              cosmic::iced::Color::from_rgb(0.72, 0.55, 0.98), "Audit Replay"),
-            // 7 — (divider group) — 8 Security Settings
+            // 8 — (divider group) — 9 Security Settings
             (NavPage::Settings,       crate::icons::shield    as IconFn,
              cosmic::iced::Color::from_rgb(0.42, 0.88, 0.55), "Security Settings"),
-            // 9 — General Settings
+            // 10 — General Settings
             (NavPage::GeneralSettings, crate::icons::gear     as IconFn,
              cosmic::iced::Color::from_rgb(0.62, 0.72, 0.88), "General Settings"),
         ];
@@ -7274,8 +7360,8 @@ impl OpenClawApp {
         let mut nav_buttons: Vec<Element<'_, AppMessage>> = Vec::new();
 
         for (idx, &(page, icon_fn, accent, en)) in items.iter().enumerate() {
-            // Divider before: AI Assistant(2), Claw Terminal(3), Digital Workers(4), Security Settings(6)
-            if idx == 2 || idx == 3 || idx == 4 || idx == 6 {
+            // Divider before: AI Assistant(2), Claw Terminal(3), Skills Browser(4), Digital Workers(5), Security Settings(7)
+            if idx == 2 || idx == 3 || idx == 4 || idx == 5 || idx == 7 {
                 nav_buttons.push(
                     widget::container(widget::divider::horizontal::light())
                         .padding([2, 8])
@@ -7481,6 +7567,7 @@ impl OpenClawApp {
                     NavPage::PluginStore    => t(lang, "Plugin Store",      "插件商店"),
                     NavPage::GeneralSettings => t(lang, "General Settings", "通用设置"),
                     NavPage::ClawTerminal     => t(lang, "Claw Terminal",     "Claw 终端"),
+                    NavPage::Skills           => t(lang, "Skills Browser",    "技能浏览器"),
                     NavPage::Agents           => t(lang, "Digital Workers",   "数字员工"),
                     NavPage::AuditReplay       => t(lang, "Audit Replay",       "审计回放"),
                 };
