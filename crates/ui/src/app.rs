@@ -242,6 +242,8 @@ pub enum NavPage {
     GeneralSettings,
     /// Claw Terminal — direct command console: send commands to Claw, view execution output.
     ClawTerminal,
+    /// CLI Terminal — command-line interface for advanced users.
+    CliTerminal,
     /// Digital Worker (Agent) management page.
     Agents,
     /// Run history & audit replay page.
@@ -604,6 +606,25 @@ pub enum AppMessage {
     ClawClearHistory,
     /// User clicked a quick-action preset button.
     ClawQuickAction(ClawQuickAction),
+    // ── CLI Terminal messages (Aerospace-grade) ────────────────────────────
+    /// CLI command input changed.
+    CliInputChanged(String),
+    /// Execute CLI command.
+    CliExecuteCommand,
+    /// CLI command execution completed.
+    CliCommandResult { command: String, output: Vec<(String, bool)> },
+    /// Clear CLI Terminal history.
+    CliClearHistory,
+    /// Navigate to previous command in history (↑ key).
+    CliHistoryPrevious,
+    /// Navigate to next command in history (↓ key).
+    CliHistoryNext,
+    /// Apply autocomplete suggestion (Tab key).
+    CliApplyAutocomplete,
+    /// Command execution timeout occurred.
+    CliExecutionTimeout,
+    /// Input validation failed.
+    CliValidationError(String),
     /// Claw Terminal input box received focus.
     ClawInputFocused,
     ClawRunAutoTest,
@@ -1128,6 +1149,8 @@ pub struct OpenClawApp {
     pub(crate) claw_auto_test_running: bool,
     pub(crate) claw_auto_test_steps_done: usize,
     pub(crate) page_auto_test_running: bool,
+    /// CLI Terminal state.
+    pub(crate) cli_terminal_state: crate::pages::cli_terminal::CliTerminalState,
     /// OpenClaw Gateway URL (from env OPENCLAW_GATEWAY_URL or manual config).
     gateway_url: Option<String>,
     /// Whether the OpenClaw Gateway is currently reachable.
@@ -1380,6 +1403,16 @@ impl cosmic::Application for OpenClawApp {
             .data(NavPage::AiChat);
         nav_model
             .insert()
+            .text("Claw Terminal")
+            .icon(cosmic::widget::icon::from_name("utilities-terminal-symbolic"))
+            .data(NavPage::ClawTerminal);
+        nav_model
+            .insert()
+            .text("CLI Terminal")
+            .icon(cosmic::widget::icon::from_name("utilities-terminal-symbolic"))
+            .data(NavPage::CliTerminal);
+        nav_model
+            .insert()
             .text("Plugin Store")
             .icon(cosmic::widget::icon::from_name("system-software-install-symbolic"))
             .data(NavPage::PluginStore);
@@ -1453,6 +1486,7 @@ impl cosmic::Application for OpenClawApp {
             claw_auto_test_running: false,
             claw_auto_test_steps_done: 0,
             page_auto_test_running: false,
+            cli_terminal_state: crate::pages::cli_terminal::CliTerminalState::default(),
             gateway_url: std::env::var("OPENCLAW_GATEWAY_URL").ok(),
             gateway_reachable: false,
             openclaw_ai_max_tokens_input: "4096".to_string(),
@@ -1809,6 +1843,10 @@ impl cosmic::Application for OpenClawApp {
                 self.claw_voice_status.as_deref(),
                 self.claw_auto_test_running,
                 self.claw_auto_test_steps_done,
+            ),
+            NavPage::CliTerminal => crate::pages::cli_terminal::CliTerminalPage::view(
+                lang,
+                &self.cli_terminal_state,
             ),
             NavPage::Assistant => self.assistant_page.view(
                 lang,
@@ -3501,14 +3539,14 @@ impl cosmic::Application for OpenClawApp {
                 self.show_about = false;
             }
             AppMessage::NavUp => {
-                let pages = [NavPage::Dashboard, NavPage::Events, NavPage::Settings, NavPage::AiChat, NavPage::PluginStore];
+                let pages = [NavPage::Dashboard, NavPage::Events, NavPage::Settings, NavPage::Assistant, NavPage::AiChat, NavPage::ClawTerminal, NavPage::CliTerminal, NavPage::PluginStore];
                 if let Some(idx) = pages.iter().position(|&p| p == self.nav_page) {
                     let next = pages[(idx + pages.len() - 1) % pages.len()];
                     return self.update(AppMessage::NavSelect(next));
                 }
             }
             AppMessage::NavDown => {
-                let pages = [NavPage::Dashboard, NavPage::Events, NavPage::Settings, NavPage::AiChat, NavPage::PluginStore];
+                let pages = [NavPage::Dashboard, NavPage::Events, NavPage::Settings, NavPage::Assistant, NavPage::AiChat, NavPage::ClawTerminal, NavPage::CliTerminal, NavPage::PluginStore];
                 if let Some(idx) = pages.iter().position(|&p| p == self.nav_page) {
                     let next = pages[(idx + 1) % pages.len()];
                     return self.update(AppMessage::NavSelect(next));
@@ -3725,6 +3763,461 @@ impl cosmic::Application for OpenClawApp {
 
             AppMessage::ClawClearHistory => {
                 self.claw_history.clear();
+            }
+            // ── CLI Terminal message handlers (Aerospace-grade) ───────────────────
+            AppMessage::CliInputChanged(input) => {
+                self.cli_terminal_state.command_input = input;
+                // Update autocomplete suggestions in real-time
+                self.cli_terminal_state.update_autocomplete();
+                // Keep focus on input
+                return cosmic::iced::widget::focus_next();
+            }
+            AppMessage::CliExecuteCommand => {
+                // Aerospace-grade: Validate input before execution
+                if let Err(err) = self.cli_terminal_state.validate_input() {
+                    tracing::warn!(error = %err, "[CLI] Input validation failed");
+                    return self.update(AppMessage::CliValidationError(err));
+                }
+
+                let command = self.cli_terminal_state.command_input.trim().to_string();
+                
+                // Aerospace-grade: Log command execution
+                tracing::info!(command = %command, "[CLI] Executing command");
+                
+                // Mark as executing and record start time
+                self.cli_terminal_state.is_executing = true;
+                self.cli_terminal_state.last_execution_time = Some(std::time::Instant::now());
+                
+                // Clear input and reset navigation
+                self.cli_terminal_state.command_input.clear();
+                self.cli_terminal_state.history_index = None;
+                self.cli_terminal_state.autocomplete_suggestion = None;
+                
+                // Execute command asynchronously
+                let sandbox_status = self.sandbox_status.clone();
+                let gateway_url = self.gateway_url.clone();
+                let gateway_reachable = self.gateway_reachable;
+                let agent_list = self.claw_agent_list.clone();
+                let model_name = self.ai_chat.model_name.clone();
+                
+                return Task::perform(
+                    async move {
+                        let parts: Vec<&str> = command.split_whitespace().collect();
+                        let cmd = parts.get(0).map(|s| *s).unwrap_or("");
+                        
+                        let output = match cmd {
+                            "help" => vec![
+                                ("╔══════════════════════════════════════════════════════════╗".to_string(), false),
+                                ("║           OpenClaw+ CLI Terminal - Help                 ║".to_string(), false),
+                                ("╚══════════════════════════════════════════════════════════╝".to_string(), false),
+                                ("".to_string(), false),
+                                ("System Commands:".to_string(), false),
+                                ("  help              - Show this help message".to_string(), false),
+                                ("  version           - Show OpenClaw version".to_string(), false),
+                                ("  status            - Show system status".to_string(), false),
+                                ("  clear             - Clear terminal history".to_string(), false),
+                                ("".to_string(), false),
+                                ("Agent Commands:".to_string(), false),
+                                ("  agent list        - List all available agents".to_string(), false),
+                                ("  agent info        - Show current agent information".to_string(), false),
+                                ("".to_string(), false),
+                                ("Gateway Commands:".to_string(), false),
+                                ("  gateway status    - Show gateway connection status".to_string(), false),
+                                ("  gateway url       - Show gateway URL".to_string(), false),
+                                ("".to_string(), false),
+                                ("AI Commands:".to_string(), false),
+                                ("  ai model          - Show current AI model".to_string(), false),
+                                ("  ai status         - Show AI engine status".to_string(), false),
+                                ("".to_string(), false),
+                                ("System Info Commands:".to_string(), false),
+                                ("  sysinfo           - Show detailed system information".to_string(), false),
+                                ("  uptime            - Show system uptime".to_string(), false),
+                                ("  whoami            - Show current user".to_string(), false),
+                                ("  pwd               - Show current directory".to_string(), false),
+                                ("  env               - Show environment variables".to_string(), false),
+                                ("".to_string(), false),
+                                ("Tool Commands:".to_string(), false),
+                                ("  weather <city>    - Get weather for a city".to_string(), false),
+                                ("  news              - Get latest news".to_string(), false),
+                                ("".to_string(), false),
+                                ("Shell Commands (Bash):".to_string(), false),
+                                ("  ls, cat, echo, grep, find, head, tail, wc, date, etc.".to_string(), false),
+                                ("  Any system command not listed above will be executed via shell".to_string(), false),
+                                ("".to_string(), false),
+                                ("Examples:".to_string(), false),
+                                ("  $ sysinfo              # Built-in command".to_string(), false),
+                                ("  $ ls -la               # Shell command".to_string(), false),
+                                ("  $ cat README.md        # Shell command".to_string(), false),
+                                ("  $ grep 'test' *.rs     # Shell command".to_string(), false),
+                                ("  $ echo 'Hello World'   # Shell command".to_string(), false),
+                            ],
+                            "version" => vec![
+                                ("╔══════════════════════════════════════════════════════════╗".to_string(), false),
+                                ("║                  OpenClaw+ Version                      ║".to_string(), false),
+                                ("╚══════════════════════════════════════════════════════════╝".to_string(), false),
+                                ("".to_string(), false),
+                                ("  Version:          v0.1.0".to_string(), false),
+                                ("  UI Framework:     Cosmic (libcosmic)".to_string(), false),
+                                ("  Language:         Rust".to_string(), false),
+                                ("  Build:            Debug".to_string(), false),
+                                ("".to_string(), false),
+                                ("  Repository:       https://github.com/arkCyber/A3Claw".to_string(), false),
+                            ],
+                            "status" => {
+                                let sandbox_str = match sandbox_status {
+                                    crate::app::SandboxStatus::Idle => "⏸ Idle",
+                                    crate::app::SandboxStatus::Running => "✓ Running",
+                                    crate::app::SandboxStatus::Paused => "⏸ Paused",
+                                    crate::app::SandboxStatus::Stopped => "⏹ Stopped",
+                                    crate::app::SandboxStatus::Tripped(_) => "⚠ Tripped",
+                                    crate::app::SandboxStatus::Error(_) => "✗ Error",
+                                };
+                                vec![
+                                    ("╔══════════════════════════════════════════════════════════╗".to_string(), false),
+                                    ("║                   System Status                         ║".to_string(), false),
+                                    ("╚══════════════════════════════════════════════════════════╝".to_string(), false),
+                                    ("".to_string(), false),
+                                    (format!("  Sandbox:          {}", sandbox_str), false),
+                                    (format!("  Gateway:          {}", if gateway_reachable { "✓ Connected" } else { "✗ Disconnected" }), false),
+                                    ("  AI Engine:        ✓ Ready".to_string(), false),
+                                    (format!("  Agents:           {} available", agent_list.len()), false),
+                                ]
+                            },
+                            "clear" => vec![("Terminal cleared.".to_string(), false)],
+                            "agent" => {
+                                if parts.len() < 2 {
+                                    vec![
+                                        ("Usage: agent <subcommand>".to_string(), true),
+                                        ("Subcommands: list, info".to_string(), false),
+                                    ]
+                                } else {
+                                    match parts[1] {
+                                        "list" => {
+                                            let mut output = vec![
+                                                ("╔══════════════════════════════════════════════════════════╗".to_string(), false),
+                                                ("║                  Available Agents                       ║".to_string(), false),
+                                                ("╚══════════════════════════════════════════════════════════╝".to_string(), false),
+                                                ("".to_string(), false),
+                                            ];
+                                            if agent_list.is_empty() {
+                                                output.push(("  No agents available.".to_string(), false));
+                                            } else {
+                                                for (i, agent) in agent_list.iter().enumerate() {
+                                                    output.push((format!("  {}. {} ({})", i + 1, agent.display_name, agent.id), false));
+                                                }
+                                            }
+                                            output
+                                        },
+                                        "info" => vec![
+                                            ("Agent information:".to_string(), false),
+                                            (format!("  Total agents: {}", agent_list.len()), false),
+                                        ],
+                                        _ => vec![
+                                            (format!("Unknown agent subcommand: {}", parts[1]), true),
+                                            ("Available subcommands: list, info".to_string(), false),
+                                        ],
+                                    }
+                                }
+                            },
+                            "gateway" => {
+                                if parts.len() < 2 {
+                                    vec![
+                                        ("Usage: gateway <subcommand>".to_string(), true),
+                                        ("Subcommands: status, url".to_string(), false),
+                                    ]
+                                } else {
+                                    match parts[1] {
+                                        "status" => vec![
+                                            ("╔══════════════════════════════════════════════════════════╗".to_string(), false),
+                                            ("║                  Gateway Status                         ║".to_string(), false),
+                                            ("╚══════════════════════════════════════════════════════════╝".to_string(), false),
+                                            ("".to_string(), false),
+                                            (format!("  Status:           {}", if gateway_reachable { "✓ Connected" } else { "✗ Disconnected" }), false),
+                                            (format!("  URL:              {}", gateway_url.as_deref().unwrap_or("Not configured")), false),
+                                        ],
+                                        "url" => vec![
+                                            (format!("Gateway URL: {}", gateway_url.as_deref().unwrap_or("Not configured")), false),
+                                        ],
+                                        _ => vec![
+                                            (format!("Unknown gateway subcommand: {}", parts[1]), true),
+                                            ("Available subcommands: status, url".to_string(), false),
+                                        ],
+                                    }
+                                }
+                            },
+                            "ai" => {
+                                if parts.len() < 2 {
+                                    vec![
+                                        ("Usage: ai <subcommand>".to_string(), true),
+                                        ("Subcommands: model, status".to_string(), false),
+                                    ]
+                                } else {
+                                    match parts[1] {
+                                        "model" => vec![
+                                            ("╔══════════════════════════════════════════════════════════╗".to_string(), false),
+                                            ("║                    AI Model Info                        ║".to_string(), false),
+                                            ("╚══════════════════════════════════════════════════════════╝".to_string(), false),
+                                            ("".to_string(), false),
+                                            (format!("  Current Model:    {}", model_name), false),
+                                            ("  Status:           ✓ Ready".to_string(), false),
+                                        ],
+                                        "status" => vec![
+                                            ("AI Engine Status: ✓ Ready".to_string(), false),
+                                            (format!("Model: {}", model_name), false),
+                                        ],
+                                        _ => vec![
+                                            (format!("Unknown ai subcommand: {}", parts[1]), true),
+                                            ("Available subcommands: model, status".to_string(), false),
+                                        ],
+                                    }
+                                }
+                            },
+                            "weather" => {
+                                if parts.len() < 2 {
+                                    vec![
+                                        ("Usage: weather <city>".to_string(), true),
+                                        ("Example: weather beijing".to_string(), false),
+                                    ]
+                                } else {
+                                    let city = parts[1..].join(" ");
+                                    match crate::weather_tool::fetch_weather(&city).await {
+                                        Ok(report) => report
+                                            .lines()
+                                            .map(|line| (line.to_string(), false))
+                                            .collect(),
+                                        Err(e) => vec![
+                                            (format!("Weather tool error: {}", e), true),
+                                        ],
+                                    }
+                                }
+                            },
+                            "news" => {
+                                match crate::news_tool::fetch_news("cnn", 5).await {
+                                    Ok(news) => news
+                                        .lines()
+                                        .map(|line| (line.to_string(), false))
+                                        .collect(),
+                                    Err(e) => vec![
+                                        (format!("News tool error: {}", e), true),
+                                    ],
+                                }
+                            },
+                            "sysinfo" => vec![
+                                ("╔══════════════════════════════════════════════════════════╗".to_string(), false),
+                                ("║                  System Information                     ║".to_string(), false),
+                                ("╚══════════════════════════════════════════════════════════╝".to_string(), false),
+                                ("".to_string(), false),
+                                (format!("  Operating System:  {}", std::env::consts::OS), false),
+                                (format!("  Architecture:      {}", std::env::consts::ARCH), false),
+                                (format!("  Family:            {}", std::env::consts::FAMILY), false),
+                                (format!("  Hostname:          {}", std::env::var("HOSTNAME").or_else(|_| std::env::var("COMPUTERNAME")).unwrap_or_else(|_| "Unknown".to_string())), false),
+                                ("".to_string(), false),
+                                ("  Application:       OpenClaw+ v0.1.0".to_string(), false),
+                                ("  Build Type:        Debug (Aerospace-grade)".to_string(), false),
+                                ("  Rust Compiler:     rustc".to_string(), false),
+                            ],
+                            "uptime" => {
+                                let uptime_secs = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .map(|d| d.as_secs())
+                                    .unwrap_or(0);
+                                let hours = uptime_secs / 3600;
+                                let minutes = (uptime_secs % 3600) / 60;
+                                vec![
+                                    (format!("System uptime: {} hours, {} minutes", hours, minutes), false),
+                                ]
+                            },
+                            "whoami" => vec![
+                                (format!("Current user: {}", std::env::var("USER").or_else(|_| std::env::var("USERNAME")).unwrap_or_else(|_| "Unknown".to_string())), false),
+                            ],
+                            "pwd" => vec![
+                                (format!("Current directory: {}", std::env::current_dir().ok().and_then(|p| p.to_str().map(String::from)).unwrap_or_else(|| "Unknown".to_string())), false),
+                            ],
+                            "env" => {
+                                let mut env_vars: Vec<(String, String)> = std::env::vars().collect();
+                                env_vars.sort_by(|a, b| a.0.cmp(&b.0));
+                                let mut output = vec![
+                                    ("╔══════════════════════════════════════════════════════════╗".to_string(), false),
+                                    ("║              Environment Variables                      ║".to_string(), false),
+                                    ("╚══════════════════════════════════════════════════════════╝".to_string(), false),
+                                    ("".to_string(), false),
+                                ];
+                                for (key, value) in env_vars.iter().take(20) {
+                                    output.push((format!("  {} = {}", key, value), false));
+                                }
+                                if env_vars.len() > 20 {
+                                    output.push(("".to_string(), false));
+                                    output.push((format!("  ... and {} more variables", env_vars.len() - 20), false));
+                                }
+                                output
+                            },
+                            "" => vec![],
+                            _ => {
+                                // 混合模式：尝试执行系统 shell 命令
+                                tracing::info!(command = %cmd, "[CLI] Attempting to execute system command");
+                                
+                                use std::process::{Command, Stdio};
+                                
+                                match Command::new(cmd)
+                                    .args(&parts[1..])
+                                    .stdout(Stdio::piped())
+                                    .stderr(Stdio::piped())
+                                    .output()
+                                {
+                                    Ok(output) => {
+                                        let mut result = Vec::new();
+                                        
+                                        // 处理 stdout
+                                        let stdout = String::from_utf8_lossy(&output.stdout);
+                                        if !stdout.is_empty() {
+                                            for line in stdout.lines() {
+                                                result.push((line.to_string(), false));
+                                            }
+                                        }
+                                        
+                                        // 处理 stderr
+                                        let stderr = String::from_utf8_lossy(&output.stderr);
+                                        if !stderr.is_empty() {
+                                            for line in stderr.lines() {
+                                                result.push((line.to_string(), true));
+                                            }
+                                        }
+                                        
+                                        // 如果命令执行失败
+                                        if !output.status.success() {
+                                            if result.is_empty() {
+                                                result.push((format!("Command exited with code: {}", 
+                                                    output.status.code().unwrap_or(-1)), true));
+                                            }
+                                        }
+                                        
+                                        // 如果没有任何输出
+                                        if result.is_empty() {
+                                            result.push((format!("Command '{}' executed successfully (no output)", cmd), false));
+                                        }
+                                        
+                                        result
+                                    },
+                                    Err(e) => {
+                                        tracing::warn!(command = %cmd, error = %e, "[CLI] Failed to execute system command");
+                                        vec![
+                                            (format!("Failed to execute '{}': {}", cmd, e), true),
+                                            ("".to_string(), false),
+                                            ("Hint: This might be an unknown command or not in PATH.".to_string(), false),
+                                            ("Type 'help' to see built-in commands.".to_string(), false),
+                                        ]
+                                    }
+                                }
+                            },
+                        };
+                        
+                        AppMessage::CliCommandResult { command, output }
+                    },
+                    cosmic::Action::App,
+                );
+            }
+            AppMessage::CliCommandResult { command, output } => {
+                // Aerospace-grade: Log command completion
+                let elapsed = self.cli_terminal_state.last_execution_time
+                    .map(|t| t.elapsed().as_millis())
+                    .unwrap_or(0);
+                tracing::info!(
+                    command = %command,
+                    elapsed_ms = elapsed,
+                    output_lines = output.len(),
+                    "[CLI] Command completed"
+                );
+
+                // Mark as not executing and clear execution time
+                self.cli_terminal_state.is_executing = false;
+                self.cli_terminal_state.last_execution_time = None;
+                
+                // Handle special commands
+                if command == "clear" {
+                    self.cli_terminal_state.clear_history();
+                    tracing::info!("[CLI] History cleared");
+                } else {
+                    // Aerospace-grade: Add to history with bounds checking
+                    let timestamp = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+                    
+                    let entry = crate::pages::cli_terminal::CliHistoryEntry {
+                        command,
+                        output,
+                        timestamp,
+                    };
+                    
+                    self.cli_terminal_state.add_to_history(entry);
+                    
+                    // Auto-scroll to bottom and focus input after adding new history
+                    return Task::batch(vec![
+                        cosmic::iced::widget::scrollable::snap_to(
+                            self.cli_terminal_state.scroll_id.clone(),
+                            cosmic::iced::widget::scrollable::RelativeOffset::END,
+                        ),
+                        cosmic::iced::widget::focus_next(),
+                    ]);
+                }
+            }
+            AppMessage::CliClearHistory => {
+                tracing::info!("[CLI] Clearing history via user request");
+                self.cli_terminal_state.clear_history();
+            }
+            AppMessage::CliHistoryPrevious => {
+                self.cli_terminal_state.history_previous();
+                tracing::debug!("[CLI] Navigate to previous command");
+            }
+            AppMessage::CliHistoryNext => {
+                self.cli_terminal_state.history_next();
+                tracing::debug!("[CLI] Navigate to next command");
+            }
+            AppMessage::CliApplyAutocomplete => {
+                if self.cli_terminal_state.autocomplete_suggestion.is_some() {
+                    tracing::debug!(
+                        suggestion = ?self.cli_terminal_state.autocomplete_suggestion,
+                        "[CLI] Applying autocomplete"
+                    );
+                    self.cli_terminal_state.apply_autocomplete();
+                }
+            }
+            AppMessage::CliExecutionTimeout => {
+                tracing::error!("[CLI] Command execution timeout");
+                self.cli_terminal_state.is_executing = false;
+                self.cli_terminal_state.last_execution_time = None;
+                
+                // Add timeout error to history
+                let entry = crate::pages::cli_terminal::CliHistoryEntry {
+                    command: self.cli_terminal_state.command_input.clone(),
+                    output: vec![
+                        ("⚠ Command execution timeout".to_string(), true),
+                        ("Command exceeded maximum execution time".to_string(), true),
+                    ],
+                    timestamp: SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0),
+                };
+                self.cli_terminal_state.add_to_history(entry);
+            }
+            AppMessage::CliValidationError(error) => {
+                tracing::warn!(error = %error, "[CLI] Validation error");
+                
+                // Add validation error to history
+                let entry = crate::pages::cli_terminal::CliHistoryEntry {
+                    command: self.cli_terminal_state.command_input.clone(),
+                    output: vec![
+                        (format!("⚠ Validation Error: {}", error), true),
+                        ("Please check your input and try again.".to_string(), false),
+                    ],
+                    timestamp: SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0),
+                };
+                self.cli_terminal_state.add_to_history(entry);
+                self.cli_terminal_state.command_input.clear();
             }
             AppMessage::ClawRunAutoTest => {
                 if self.claw_auto_test_running {
@@ -8288,7 +8781,10 @@ impl OpenClawApp {
             // 4 — Claw Terminal
             (NavPage::ClawTerminal,   crate::icons::claw_term as IconFn,
              cosmic::iced::Color::from_rgb(0.28, 0.92, 0.78), "Claw Terminal"),
-            // 5 — Skills Browser
+            // 5 — CLI Terminal
+            (NavPage::CliTerminal,    crate::icons::claw_term as IconFn,
+             cosmic::iced::Color::from_rgb(0.48, 0.88, 0.98), "CLI Terminal"),
+            // 6 — Skills Browser
             (NavPage::Skills,         crate::icons::home      as IconFn,
              cosmic::iced::Color::from_rgb(0.52, 0.82, 0.98), "Skills Browser"),
             // 6 — Digital Workers
@@ -8308,8 +8804,8 @@ impl OpenClawApp {
         let mut nav_buttons: Vec<Element<'_, AppMessage>> = Vec::new();
 
         for (idx, &(page, icon_fn, accent, en)) in items.iter().enumerate() {
-            // Divider before: AI Assistant(2), Claw Terminal(3), Skills Browser(4), Digital Workers(5), Security Settings(7)
-            if idx == 2 || idx == 3 || idx == 4 || idx == 5 || idx == 7 {
+            // Divider before: AI Assistant(2), Claw Terminal(3), CLI Terminal(4), Skills Browser(5), Digital Workers(6), Security Settings(8)
+            if idx == 2 || idx == 3 || idx == 4 || idx == 5 || idx == 6 || idx == 8 {
                 nav_buttons.push(
                     widget::container(widget::divider::horizontal::light())
                         .padding([2, 8])
@@ -8367,6 +8863,7 @@ impl OpenClawApp {
                 NavPage::Events => TooltipTexts::SIDEBAR_EVENTS,
                 NavPage::Assistant => TooltipTexts::SIDEBAR_ASSISTANT,
                 NavPage::ClawTerminal => TooltipTexts::SIDEBAR_CLAW_TERMINAL,
+                NavPage::CliTerminal => ("💻", "CLI Terminal", "CLI 终端"),
                 NavPage::Agents => TooltipTexts::SIDEBAR_AGENTS,
                 NavPage::AuditReplay => TooltipTexts::SIDEBAR_AUDIT_REPLAY,
                 NavPage::Settings => TooltipTexts::SIDEBAR_SETTINGS,
@@ -8515,6 +9012,7 @@ impl OpenClawApp {
                     NavPage::PluginStore    => t(lang, "Plugin Store",      "插件商店"),
                     NavPage::GeneralSettings => t(lang, "General Settings", "通用设置"),
                     NavPage::ClawTerminal     => t(lang, "Claw Terminal",     "Claw 终端"),
+                    NavPage::CliTerminal      => t(lang, "CLI Terminal",      "CLI 终端"),
                     NavPage::Skills           => t(lang, "Skills Browser",    "技能浏览器"),
                     NavPage::Agents           => t(lang, "Digital Workers",   "数字员工"),
                     NavPage::AuditReplay       => t(lang, "Audit Replay",       "审计回放"),

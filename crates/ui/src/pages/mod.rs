@@ -11,3 +11,4 @@ pub mod skills;
 #[cfg(test)]
 mod skills_test;
 pub mod claw_terminal;
+pub mod cli_terminal;
