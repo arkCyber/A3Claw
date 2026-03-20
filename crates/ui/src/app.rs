@@ -21,7 +21,120 @@ use openclaw_storage::types::{RunRecord, StepRecord, AuditEventRecord};
 use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+#[derive(Debug, Clone)]
+struct ClawAgentStreamEvent {
+    user_entry_id: u64,
+    reply_entry_id: u64,
+    agent_id: String,
+    delta: String,
+    done: bool,
+    ok: bool,
+    elapsed_ms: u64,
+}
+
+fn claw_refresh_stream_display(
+    claw_history: &mut Vec<ClawEntry>,
+    stream_buffers: &std::collections::HashMap<u64, String>,
+    stream_reply_map: &std::collections::HashMap<u64, u64>,
+    cursor_visible: bool,
+) {
+    for (&_user_entry_id, &reply_entry_id) in stream_reply_map.iter() {
+        let Some(entry) = claw_history.iter_mut().find(|e| e.id == reply_entry_id) else { continue; };
+        if !matches!(entry.status, ClawEntryStatus::Running) {
+            continue;
+        }
+        let buf = stream_buffers.get(&reply_entry_id).cloned().unwrap_or_default();
+        let display = if cursor_visible { format!("{}▍", buf) } else { buf };
+        entry.output_lines = display
+            .split('\n')
+            .map(|l| (l.to_string(), false))
+            .collect();
+    }
+}
+
+fn claw_user_entry_id_for_reply_entry_id(
+    stream_reply_map: &std::collections::HashMap<u64, u64>,
+    reply_entry_id: u64,
+) -> Option<u64> {
+    stream_reply_map
+        .iter()
+        .find(|(_uid, rid)| **rid == reply_entry_id)
+        .map(|(uid, _)| *uid)
+}
+
+fn claw_latest_running_stream_user_entry_id(
+    tasks: &std::collections::HashMap<u64, tokio::task::JoinHandle<()>>,
+) -> Option<u64> {
+    tasks.keys().copied().max()
+}
 use std::time::{SystemTime, UNIX_EPOCH};
+
+fn claw_apply_agent_stream_delta(
+    claw_history: &mut Vec<ClawEntry>,
+    stream_buffers: &mut std::collections::HashMap<u64, String>,
+    cursor_visible: bool,
+    user_entry_id: u64,
+    reply_entry_id: u64,
+    delta: &str,
+    done: bool,
+    ok: bool,
+    elapsed_ms: u64,
+) {
+    let buf = stream_buffers.entry(reply_entry_id).or_insert_with(String::new);
+    buf.push_str(delta);
+
+    if let Some(reply_entry) = claw_history.iter_mut().find(|e| e.id == reply_entry_id) {
+        if reply_entry.output_lines.is_empty() {
+            reply_entry.output_lines.push((String::new(), false));
+        }
+
+        // Make sure the cursor is not duplicated while we append new content.
+        if let Some((last, _)) = reply_entry.output_lines.last_mut() {
+            if last.ends_with('▍') {
+                last.pop();
+            }
+        }
+
+        // Incrementally append only the new delta to output_lines.
+        // This avoids splitting the full accumulated buffer on every token.
+        let mut first = true;
+        for part in delta.split('\n') {
+            if first {
+                if let Some((last, _)) = reply_entry.output_lines.last_mut() {
+                    last.push_str(part);
+                }
+                first = false;
+            } else {
+                reply_entry.output_lines.push((part.to_string(), false));
+            }
+        }
+
+        // Cursor rendering (UI-only).
+        if !done && cursor_visible {
+            if let Some((last, _)) = reply_entry.output_lines.last_mut() {
+                last.push('▍');
+            }
+        }
+
+        reply_entry.status = if done {
+            if ok { ClawEntryStatus::Success } else { ClawEntryStatus::Error(1) }
+        } else {
+            ClawEntryStatus::Running
+        };
+
+        if done {
+            reply_entry.elapsed_ms = Some(elapsed_ms);
+        }
+    }
+
+    if done {
+        if let Some(user_entry) = claw_history.iter_mut().find(|e| e.id == user_entry_id) {
+            user_entry.status = if ok { ClawEntryStatus::Success } else { ClawEntryStatus::Error(1) };
+            user_entry.elapsed_ms = Some(elapsed_ms);
+        }
+    }
+}
 
 use crate::pages::{
     ai_chat::{AiChatPage, AiChatState},
@@ -35,6 +148,8 @@ use crate::tooltip_helper::{with_tooltip_bubble_icon_arrow_i18n, TooltipPosition
 use crate::theme::{Language, t, tx};
 
 const MAX_EVENT_HISTORY: usize = 500;
+pub(crate) const CLAW_SUPER_AGENT_ID: &str = "__openclaw_super__";
+pub(crate) const CLAW_SUPER_AGENT_NAME: &str = "OpenClaw";
 
 /// System prompt for the NL Agent intent parser.
 /// The AI must respond with a JSON array of action steps.
@@ -408,10 +523,31 @@ pub enum AppMessage {
     ClawSelectAgent(Option<String>),
     /// Send a message to the selected agent in Claw Terminal.
     ClawAgentChat(String),
+    /// Streaming delta from agent chat (updates the assistant reply entry incrementally).
+    ClawAgentStream {
+        user_entry_id: u64,
+        reply_entry_id: u64,
+        agent_id: String,
+        delta: String,
+        done: bool,
+        ok: bool,
+        elapsed_ms: u64,
+    },
+    /// Stop the running agent stream (if any) for the given user entry.
+    ClawStopGeneration { user_entry_id: u64 },
+    /// Stop a running agent stream by targeting the assistant reply entry id.
+    /// (Used by per-message Stop buttons in the Claw Terminal history list.)
+    ClawStopGenerationByReply { reply_entry_id: u64 },
+    /// Stop the most recent running agent stream (Claw Terminal UX).
+    ClawStopActiveGeneration,
+    /// Cursor blink tick for streaming replies.
+    ClawCursorTick,
     /// Agent response received.
     ClawAgentResponse { agent_id: String, content: String, latency_ms: u64, user_entry_id: u64 },
     /// AI connection test result.
     OpenClawAiTestResult { ok: bool, message: String },
+    /// News fetch completed (for Claw Terminal agent chat).
+    ClawNewsFetched { user_entry_id: u64, news_data: Result<String, String> },
     // ── Channel config messages ────────────────────────────────────────────
     /// Add a new channel of the given kind.
     ChannelAdd(ChannelKind),
@@ -972,9 +1108,23 @@ pub struct OpenClawApp {
     claw_selected_agent_id: Option<String>,
     /// Claw Terminal: list of available agents for selection.
     claw_agent_list: Vec<openclaw_security::AgentProfile>,
+    /// Claw Terminal: whether we've performed one-time bootstrap (auto agent selection + welcome hint).
+    claw_terminal_bootstrapped: bool,
     /// Claw Terminal: per-agent conversation history for multi-turn chat.
     /// Key = agent_id, Value = vec of (role, content).
     claw_agent_conversations: std::collections::HashMap<String, Vec<ConversationTurn>>,
+    /// Claw Terminal: streaming reply buffers (reply_entry_id -> accumulated content).
+    claw_agent_stream_buffers: std::collections::HashMap<u64, String>,
+    /// Claw Terminal: mapping from user entry -> assistant reply entry (for streaming updates).
+    claw_agent_stream_reply_map: std::collections::HashMap<u64, u64>,
+    /// Claw Terminal: sender for streaming agent chat events into the UI subscription.
+    claw_agent_stream_tx: Option<flume::Sender<ClawAgentStreamEvent>>,
+    /// Claw Terminal: receiver for streaming agent chat events (subscription drains this channel).
+    claw_agent_stream_rx: Option<std::sync::Arc<tokio::sync::Mutex<flume::Receiver<ClawAgentStreamEvent>>>>,
+    /// Claw Terminal: running streaming tasks keyed by user_entry_id (used to support stop-generation).
+    claw_agent_stream_tasks: std::collections::HashMap<u64, tokio::task::JoinHandle<()>>,
+    /// Claw Terminal: whether the streaming cursor is visible.
+    claw_stream_cursor_visible: bool,
     pub(crate) claw_auto_test_running: bool,
     pub(crate) claw_auto_test_steps_done: usize,
     pub(crate) page_auto_test_running: bool,
@@ -1286,9 +1436,20 @@ impl cosmic::Application for OpenClawApp {
             claw_attachment: None,
             claw_recording: false,
             claw_voice_status: None,
+            /// Claw Terminal: selected agent ID for chat (None = no agent selected).
             claw_selected_agent_id: None,
+            /// Claw Terminal: list of available agents for selection.
             claw_agent_list: Vec::new(),
+            claw_terminal_bootstrapped: false,
+            /// Claw Terminal: per-agent conversation history for multi-turn chat.
+            /// Key = agent_id, Value = vec of (role, content).
             claw_agent_conversations: std::collections::HashMap::new(),
+            claw_agent_stream_buffers: std::collections::HashMap::new(),
+            claw_agent_stream_reply_map: std::collections::HashMap::new(),
+            claw_agent_stream_tx: None,
+            claw_agent_stream_rx: None,
+            claw_agent_stream_tasks: std::collections::HashMap::new(),
+            claw_stream_cursor_visible: true,
             claw_auto_test_running: false,
             claw_auto_test_steps_done: 0,
             page_auto_test_running: false,
@@ -1351,6 +1512,11 @@ impl cosmic::Application for OpenClawApp {
             skills_category: None,
             skills_selected: None,
         };
+
+        // Initialize Claw Terminal agent chat streaming channel (consumed via subscription).
+        let (claw_tx, claw_rx) = flume::unbounded::<ClawAgentStreamEvent>();
+        app.claw_agent_stream_tx = Some(claw_tx);
+        app.claw_agent_stream_rx = Some(std::sync::Arc::new(tokio::sync::Mutex::new(claw_rx)));
         app.core.window.header_title = "OpenClawPlus - AI Agent Platform".into();
 
         // Startup sequence: env health check overlay → then init AI → start sandbox
@@ -1536,7 +1702,7 @@ impl cosmic::Application for OpenClawApp {
             if page == NavPage::PluginStore {
                 return self.update(AppMessage::OpenPluginStore);
             }
-            self.nav_page = page;
+            return self.update(AppMessage::NavSelect(page));
         }
         Task::none()
     }
@@ -1706,6 +1872,45 @@ impl cosmic::Application for OpenClawApp {
                         crate::pages::ai_chat::AI_INPUT_ID.clone(),
                     ).map(cosmic::Action::App);
                 }
+
+                if page == NavPage::ClawTerminal {
+                    // Aerospace-grade: make Claw Terminal usable immediately.
+                    self.ensure_claw_terminal_chat_ready();
+
+                    // 4) One-time welcome hint (avoid spamming on every nav)
+                    if !self.claw_terminal_bootstrapped {
+                        self.claw_terminal_bootstrapped = true;
+                        
+                        // Force reset to Super OpenClaw on first entry
+                        self.claw_selected_agent_id = Some(CLAW_SUPER_AGENT_ID.to_string());
+                        tracing::info!("[CLAW] First entry - forced to Super OpenClaw");
+                        
+                        let selected = claw_agent_display_name(
+                            self.claw_selected_agent_id.as_deref(),
+                            &self.claw_agent_list,
+                        );
+                        let id = self.claw_next_id;
+                        self.claw_next_id += 1;
+                        self.claw_history.push(ClawEntry::reply(
+                            id,
+                            "✓ Super OpenClaw ready",
+                            ClawEntrySource::System,
+                            vec![
+                                (format!("默认主智能体: {}", selected), false),
+                                ("你可以直接描述需求，我会帮你补全代码、设计功能、调试排障。".to_string(), false),
+                                ("提示：点击顶部按钮可以切换到专业数字员工。".to_string(), false),
+                                ("运行 'help' 查看命令，或切换 NL 模式进行规划。".to_string(), false),
+                            ],
+                            0,
+                        ));
+                    }
+
+                    // 5) Focus the input box
+                    return cosmic::widget::text_input::focus(
+                        crate::pages::claw_terminal::CLAW_INPUT_ID.clone(),
+                    )
+                    .map(cosmic::Action::App);
+                }
             }
             AppMessage::SandboxEvent(event) => {
                 self.stats.update(&event);
@@ -1871,7 +2076,17 @@ impl cosmic::Application for OpenClawApp {
                         }
                     }
                 }
-                let engine = self.inference_engine.as_ref().unwrap().clone();
+                let engine = match self.inference_engine.as_ref() {
+                    Some(e) => {
+                        tracing::debug!("[APP] Using inference engine for AI chat");
+                        e.clone()
+                    }
+                    None => {
+                        tracing::error!("[APP] Inference engine not initialized when trying to send AI chat message");
+                        self.ai_chat.push_error("推理引擎未初始化".to_string());
+                        return Task::none();
+                    }
+                };
 
                 // Convert chat history to ConversationTurn list.
                 let messages: Vec<ConversationTurn> = history
@@ -3705,6 +3920,8 @@ impl cosmic::Application for OpenClawApp {
                 tracing::info!("[CLAW] Send command: {}", raw);
                 tracing::info!("[CLAW] Selected agent: {:?}", self.claw_selected_agent_id);
 
+                self.ensure_claw_terminal_chat_ready();
+
                 // Agent chat mode: send message to selected agent
                 let scroll_bottom = iced_scrollable::snap_to(
                     CLAW_SCROLL_ID.clone(),
@@ -3754,7 +3971,20 @@ impl cosmic::Application for OpenClawApp {
                             }
                         }
                     }
-                    let engine = self.inference_engine.as_ref().unwrap().clone();
+                    let engine = match self.inference_engine.as_ref() {
+                        Some(e) => {
+                            tracing::debug!("[APP] Using inference engine for NL command planning");
+                            e.clone()
+                        }
+                        None => {
+                            tracing::error!("[APP] Inference engine not initialized for NL command planning");
+                            let err = "推理引擎未初始化".to_string();
+                            return Task::perform(
+                                async move { AppMessage::ClawNlPlanError { entry_id, error: err } },
+                                cosmic::Action::App,
+                            );
+                        }
+                    };
                     let user_cmd = raw.clone();
                     let system_prompt = NL_AGENT_SYSTEM_PROMPT.to_string();
                     return Task::perform(
@@ -4412,12 +4642,134 @@ impl cosmic::Application for OpenClawApp {
             }
             AppMessage::ClawAgentChat(message) => {
                 if let Some(agent_id) = &self.claw_selected_agent_id {
-                    if let Some(agent) = self.claw_agent_list.iter().find(|a| a.id.as_str() == agent_id) {
-                        let agent_name = agent.display_name.clone();
-                        let agent_id_clone = agent_id.clone();
-                        let message_clone = message.clone();
+                    let msg_lower = message.to_lowercase();
+                    
+                    // 检测是否是天气请求
+                    let is_weather_request = if agent_id == CLAW_SUPER_AGENT_ID {
+                        msg_lower.contains("天气") || msg_lower.contains("weather") ||
+                        msg_lower.contains("气温") || msg_lower.contains("temperature")
+                    } else {
+                        false
+                    };
+                    
+                    // 检测是否是新闻请求
+                    let is_news_request = if agent_id == CLAW_SUPER_AGENT_ID && !is_weather_request {
+                        (msg_lower.contains("新闻") || msg_lower.contains("news")) &&
+                        (msg_lower.contains("美国") || msg_lower.contains("us") || 
+                         msg_lower.contains("最新") || msg_lower.contains("latest") ||
+                         msg_lower.contains("今天") || msg_lower.contains("today") ||
+                         msg_lower.contains("今日") || msg_lower.contains("current"))
+                    } else {
+                        false
+                    };
+                    
+                    // 如果是天气请求，先异步获取天气
+                    if is_weather_request {
+                        tracing::info!("[CLAW] Detected weather request, fetching real-time weather");
+                        
+                        // 提取位置信息 - 智能识别城市名称
+                        let location = extract_location_from_message(&message);
+                        tracing::info!("[CLAW] Extracted location: {}", location);
+                        
+                        let user_entry_id = self.claw_next_id;
+                        self.claw_next_id += 1;
+                        
+                        // 添加用户消息到历史
+                        self.claw_history.push(ClawEntry {
+                            id: user_entry_id,
+                            command: message.clone(),
+                            timestamp: std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_secs())
+                                .unwrap_or(0),
+                            output_lines: vec![],
+                            status: ClawEntryStatus::Running,
+                            elapsed_ms: None,
+                            source: ClawEntrySource::User,
+                        });
+                        
+                        let location_str = location.to_string();
+                        // 异步获取天气
+                        return Task::perform(
+                            async move {
+                                let weather_result = crate::weather_tool::fetch_weather(&location_str).await;
+                                AppMessage::ClawNewsFetched { user_entry_id, news_data: weather_result }
+                            },
+                            cosmic::Action::App,
+                        );
+                    }
+                    
+                    // 如果是新闻请求，先异步获取新闻
+                    if is_news_request {
+                        tracing::info!("[CLAW] Detected news request, fetching real-time news");
+                        let user_entry_id = self.claw_next_id;
+                        self.claw_next_id += 1;
+                        
+                        // 添加用户消息到历史
+                        self.claw_history.push(ClawEntry {
+                            id: user_entry_id,
+                            command: message.clone(),
+                            timestamp: std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_secs())
+                                .unwrap_or(0),
+                            output_lines: vec![],
+                            status: ClawEntryStatus::Running,
+                            elapsed_ms: None,
+                            source: ClawEntrySource::User,
+                        });
+                        
+                        // 异步获取新闻
+                        return Task::perform(
+                            async move {
+                                let news_result = crate::news_tool::fetch_news("cnn", 5).await;
+                                AppMessage::ClawNewsFetched { user_entry_id, news_data: news_result }
+                            },
+                            cosmic::Action::App,
+                        );
+                    }
+                    
+                    let message_with_news = message.clone();
+                    
+                    let (agent_name, agent_id_clone, system_prompt) = if agent_id == CLAW_SUPER_AGENT_ID {
+                        (
+                            CLAW_SUPER_AGENT_NAME.to_string(),
+                            CLAW_SUPER_AGENT_ID.to_string(),
+                            r#"你是 Super OpenClaw，一个全能、主动、诚实的 AI 智能体助手。当前时间：2026年3月。
 
-                        // Build role description from AgentRole
+核心能力：
+• 代码开发：代码补全、功能设计、调试排障、架构审计、测试补全
+• 信息检索：联网搜索、新闻获取、实时信息查询、文档检索
+• 工具调用：系统会自动为你提供实时数据（如新闻）
+• 命令执行：Shell 命令建议与执行规划
+• 多模态：支持文本、图片、代码等多种输入
+
+工作原则：
+1. 默认使用中文，回答要直接、专业、可执行，避免泛泛而谈
+2. 当用户询问新闻时，系统会自动获取并在消息中提供实时新闻数据
+   - 如果消息中包含 [系统提供的实时新闻数据：]，直接使用这些数据回答
+   - 不要说"正在获取"或"我来帮你获取"，数据已经提供了
+   - 直接展示新闻列表，保持原有的时间格式
+3. 对于新闻类问题的回答格式：
+   - 直接列出新闻，不要添加额外说明
+   - 保持系统提供的时间格式和内容
+   - 不要暴露"系统提供"这个细节，就像是你自己获取的一样
+4. 对于代码类问题：
+   - 直接给出完整可用的代码
+   - 说明如何使用和运行
+5. 回答要完整和自给自足，避免以反问结尾
+6. 当任务不明确时，给出多个可能的解释和对应方案
+7. 主动提供解决方案，展现全能主智能体的定位
+
+关键要求：
+• 不要暴露工具调用过程和思考步骤
+• 不要说"系统提供了数据"，直接使用数据回答
+• 直接展示最终结果
+• 用户只想看结果，不想看你如何获取的
+
+系统会自动为你提供实时数据，你只需要优雅地展示给用户即可。"#.to_string(),
+                        )
+                    } else if let Some(agent) = self.claw_agent_list.iter().find(|a| a.id.as_str() == agent_id) {
                         let role_desc = match &agent.role {
                             openclaw_security::AgentRole::TicketAssistant      => "工单助手，负责处理和分类用户工单",
                             openclaw_security::AgentRole::CodeReviewer         => "代码审查员，分析代码质量和潜在问题",
@@ -4434,28 +4786,33 @@ impl cosmic::Application for OpenClawApp {
                             openclaw_security::AgentRole::IntelOfficer         => "全网情报员，抓取、分析和汇报互联网情报",
                             openclaw_security::AgentRole::Custom { label }     => label.as_str(),
                         };
-                        let system_prompt = format!(
-                            "你是 {}，角色：{}。请简洁专业地用中文回答用户问题。",
-                            agent_name, role_desc
-                        );
+                        (
+                            agent.display_name.clone(),
+                            agent_id.clone(),
+                            format!("你是 {}，角色：{}。请简洁专业地用中文回答用户问题。", agent.display_name, role_desc),
+                        )
+                    } else {
+                        return Task::none();
+                    };
+                    let message_clone = message_with_news.clone();
 
-                        // Detect image prefix for display purposes
-                        let has_image = message.starts_with("[image:");
-                        let display_message = if has_image {
-                            // Extract user text after the image prefix line
-                            let text_part = message
-                                .lines()
-                                .skip(1)
-                                .collect::<Vec<_>>()
-                                .join("\n");
-                            if text_part.trim().is_empty() {
-                                "📎 [图片已附加]".to_string()
-                            } else {
-                                format!("📎 [图片] {}", text_part)
-                            }
+                    // Detect image prefix for display purposes
+                    let has_image = message.starts_with("[image:");
+                    let display_message = if has_image {
+                        // Extract user text after the image prefix line
+                        let text_part = message
+                            .lines()
+                            .skip(1)
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        if text_part.trim().is_empty() {
+                            "📎 [图片已附加]".to_string()
                         } else {
-                            message.clone()
-                        };
+                            format!("📎 [图片] {}", text_part)
+                        }
+                    } else {
+                        message.clone()
+                    };
 
                         // Add user message to Claw history display
                         let entry_id = self.claw_next_id;
@@ -4470,6 +4827,24 @@ impl cosmic::Application for OpenClawApp {
                             source: ClawEntrySource::User,
                             status: ClawEntryStatus::Running,
                             output_lines: vec![],
+                            elapsed_ms: None,
+                        });
+
+                        // Create assistant placeholder entry for streaming output.
+                        let reply_entry_id = self.claw_next_id;
+                        self.claw_next_id += 1;
+                        self.claw_agent_stream_reply_map.insert(entry_id, reply_entry_id);
+                        self.claw_agent_stream_buffers.insert(reply_entry_id, String::new());
+                        self.claw_history.push(ClawEntry {
+                            id: reply_entry_id,
+                            command: format!("[{}]", agent_name),
+                            timestamp: std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_secs())
+                                .unwrap_or(0),
+                            source: ClawEntrySource::OpenClaw,
+                            status: ClawEntryStatus::Running,
+                            output_lines: vec![(String::new(), false)],
                             elapsed_ms: None,
                         });
 
@@ -4562,99 +4937,241 @@ impl cosmic::Application for OpenClawApp {
                             .collect();
                         messages.extend(history_snapshot);
 
-                        eprintln!("[CLAW-AGENT] sending {} messages to agent {}", messages.len(), agent_id_clone);
-                        return Task::perform(
-                            async move {
-                                let start = std::time::Instant::now();
-                                let req = InferenceRequest {
-                                    request_id: entry_id,
-                                    messages,
-                                    max_tokens_override: Some(512),
-                                    temperature_override: Some(0.7),
-                                    stream: true,
-                                };
-                                match engine_arc.infer_stream(req).await {
-                                    Ok(mut rx) => {
-                                        let mut full_content = String::new();
-                                        while let Some(token) = rx.recv().await {
-                                            full_content.push_str(&token.delta);
-                                            if token.done { break; }
+                        let Some(stream_tx) = self.claw_agent_stream_tx.clone() else {
+                            return self.update(AppMessage::ClawNlPlanError {
+                                entry_id,
+                                error: "Internal error: stream channel not initialized".to_string(),
+                            });
+                        };
+
+                        eprintln!("[CLAW-AGENT] sending {} messages to agent {} (stream)", messages.len(), agent_id_clone);
+                        let handle = tokio::spawn(async move {
+                            let throttle = tokio::time::Duration::from_millis(33);
+                            let start = std::time::Instant::now();
+                            let req = InferenceRequest {
+                                request_id: entry_id,
+                                messages,
+                                max_tokens_override: Some(512),
+                                temperature_override: Some(0.7),
+                                stream: true,
+                            };
+
+                            match engine_arc.infer_stream(req).await {
+                                Ok(mut rx) => {
+                                    let mut pending = String::new();
+                                    let mut last_flush = std::time::Instant::now();
+                                    while let Some(token) = rx.recv().await {
+                                        let done = token.done;
+                                        pending.push_str(&token.delta);
+                                        let elapsed_ms = start.elapsed().as_millis() as u64;
+                                        let should_flush = done || last_flush.elapsed() >= throttle;
+                                        if should_flush {
+                                            let delta = std::mem::take(&mut pending);
+                                            last_flush = std::time::Instant::now();
+                                            let _ = stream_tx.send(ClawAgentStreamEvent {
+                                                user_entry_id: entry_id,
+                                                reply_entry_id,
+                                                agent_id: agent_id_clone.clone(),
+                                                delta,
+                                                done,
+                                                ok: true,
+                                                elapsed_ms,
+                                            });
                                         }
-                                        eprintln!("[CLAW-AGENT] streaming response ({} ms): {:.120}", start.elapsed().as_millis(), full_content);
-                                        AppMessage::ClawAgentResponse {
-                                            agent_id: agent_id_clone,
-                                            content: full_content,
-                                            latency_ms: start.elapsed().as_millis() as u64,
-                                            user_entry_id: entry_id,
-                                        }
-                                    }
-                                    Err(e) => {
-                                        eprintln!("[CLAW-AGENT] infer error: {e}");
-                                        AppMessage::ClawNlPlanError {
-                                            entry_id,
-                                            error: format!("AI 推理失败: {e}"),
+                                        if done {
+                                            break;
                                         }
                                     }
                                 }
-                            },
-                            cosmic::Action::App,
-                        );
+                                Err(e) => {
+                                    let elapsed_ms = start.elapsed().as_millis() as u64;
+                                    let _ = stream_tx.send(ClawAgentStreamEvent {
+                                        user_entry_id: entry_id,
+                                        reply_entry_id,
+                                        agent_id: agent_id_clone.clone(),
+                                        delta: format!("\n✗ AI 推理失败: {}", e),
+                                        done: true,
+                                        ok: false,
+                                        elapsed_ms,
+                                    });
+                                }
+                            }
+                        });
+
+                        // Track task for stop-generation.
+                        self.claw_agent_stream_tasks.insert(entry_id, handle);
+
+                        return Task::none();
+                }
+            }
+            AppMessage::ClawStopGeneration { user_entry_id } => {
+                if let Some(handle) = self.claw_agent_stream_tasks.remove(&user_entry_id) {
+                    handle.abort();
+                    if let Some(&reply_entry_id) = self.claw_agent_stream_reply_map.get(&user_entry_id) {
+                        // Mark as stopped (treated as not-ok completion).
+                        return self.update(AppMessage::ClawAgentStream {
+                            user_entry_id,
+                            reply_entry_id,
+                            agent_id: self.claw_selected_agent_id.clone().unwrap_or_default(),
+                            delta: "\n⏹ Stopped".to_string(),
+                            done: true,
+                            ok: false,
+                            elapsed_ms: 0,
+                        });
                     }
                 }
             }
-            AppMessage::ClawAgentResponse { agent_id, content, latency_ms, user_entry_id } => {
-                // Save assistant reply into per-agent conversation history for multi-turn
-                self.claw_agent_conversations
-                    .entry(agent_id.clone())
-                    .or_insert_with(Vec::new)
-                    .push(ConversationTurn {
-                        role: "assistant".to_string(),
-                        content: content.clone(),
-                    });
-
-                // Update user message entry status from Running -> Success
-                if let Some(user_entry) = self.claw_history.iter_mut().find(|e| e.id == user_entry_id) {
-                    user_entry.status = ClawEntryStatus::Success;
-                    user_entry.elapsed_ms = Some(latency_ms);
+            AppMessage::ClawStopGenerationByReply { reply_entry_id } => {
+                if let Some(user_entry_id) = claw_user_entry_id_for_reply_entry_id(
+                    &self.claw_agent_stream_reply_map,
+                    reply_entry_id,
+                ) {
+                    return self.update(AppMessage::ClawStopGeneration { user_entry_id });
                 }
-                // Will snap_to bottom after pushing the reply entry (handled below)
+            }
+            AppMessage::ClawStopActiveGeneration => {
+                if let Some(user_entry_id) = claw_latest_running_stream_user_entry_id(&self.claw_agent_stream_tasks) {
+                    return self.update(AppMessage::ClawStopGeneration { user_entry_id });
+                }
+            }
+            AppMessage::ClawAgentStream { user_entry_id, reply_entry_id, agent_id, delta, done, ok, elapsed_ms } => {
+                claw_apply_agent_stream_delta(
+                    &mut self.claw_history,
+                    &mut self.claw_agent_stream_buffers,
+                    self.claw_stream_cursor_visible,
+                    user_entry_id,
+                    reply_entry_id,
+                    &delta,
+                    done,
+                    ok,
+                    elapsed_ms,
+                );
 
+                if done && ok {
+                    // Save assistant reply into per-agent conversation history for multi-turn.
+                    let final_content = self
+                        .claw_agent_stream_buffers
+                        .get(&reply_entry_id)
+                        .cloned()
+                        .unwrap_or_default();
+                    self.claw_agent_conversations
+                        .entry(agent_id)
+                        .or_insert_with(Vec::new)
+                        .push(ConversationTurn {
+                            role: "assistant".to_string(),
+                            content: final_content,
+                        });
+                }
+
+                if done {
+                    // Prevent unbounded growth during long-running terminal usage.
+                    self.claw_agent_stream_buffers.remove(&reply_entry_id);
+                    self.claw_agent_stream_reply_map.remove(&user_entry_id);
+                    self.claw_agent_stream_tasks.remove(&user_entry_id);
+                }
+
+                // Snap to bottom for better streaming UX.
+                return iced_scrollable::snap_to(
+                    CLAW_SCROLL_ID.clone(),
+                    RelativeOffset { x: 0.0, y: 1.0 },
+                )
+                .map(cosmic::Action::App);
+            }
+            AppMessage::ClawCursorTick => {
+                if self.claw_agent_stream_tasks.is_empty() {
+                    return Task::none();
+                }
+                self.claw_stream_cursor_visible = !self.claw_stream_cursor_visible;
+                claw_refresh_stream_display(
+                    &mut self.claw_history,
+                    &self.claw_agent_stream_buffers,
+                    &self.claw_agent_stream_reply_map,
+                    self.claw_stream_cursor_visible,
+                );
+            }
+            AppMessage::ClawNewsFetched { user_entry_id, news_data } => {
+                tracing::info!("[CLAW] Processing fetched data for entry {}", user_entry_id);
+                
+                // 更新用户 entry 状态为成功
+                if let Some(entry) = self.claw_history.iter_mut().find(|e| e.id == user_entry_id) {
+                    entry.status = ClawEntryStatus::Success;
+                }
+                
+                // 准备回复内容
+                let reply_content = match news_data {
+                    Ok(data) => data,
+                    Err(e) => format!("⚠️ 获取数据失败: {}", e),
+                };
+                
+                // 创建 AI 回复 entry
+                let reply_id = self.claw_next_id;
+                self.claw_next_id += 1;
+                
+                let output_lines: Vec<(String, bool)> = reply_content
+                    .lines()
+                    .map(|line| (line.to_string(), false))
+                    .collect();
+                
+                self.claw_history.push(ClawEntry {
+                    id: reply_id,
+                    command: "[OpenClaw]".to_string(),
+                    timestamp: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0),
+                    output_lines,
+                    status: ClawEntryStatus::Success,
+                    elapsed_ms: Some(0),
+                    source: ClawEntrySource::OpenClaw,
+                });
+                
+                // 滚动到底部
+                return iced_scrollable::snap_to(
+                    CLAW_SCROLL_ID.clone(),
+                    RelativeOffset { x: 0.0, y: 1.0 },
+                )
+                .map(cosmic::Action::App);
+            }
+            AppMessage::ClawAgentResponse { agent_id, content, latency_ms, user_entry_id } => {
+                // Legacy path: reuse the streaming update mechanism (single code path).
+                if let Some(&reply_entry_id) = self.claw_agent_stream_reply_map.get(&user_entry_id) {
+                    return self.update(AppMessage::ClawAgentStream {
+                        user_entry_id,
+                        reply_entry_id,
+                        agent_id,
+                        delta: content,
+                        done: true,
+                        ok: true,
+                        elapsed_ms: latency_ms,
+                    });
+                }
+
+                // Fallback: if no reply mapping exists, keep prior behavior of appending a completed entry.
                 let agent_name = self.claw_agent_list
                     .iter()
                     .find(|a| a.id.as_str() == &agent_id)
                     .map(|a| a.display_name.clone())
                     .unwrap_or_else(|| "Agent".to_string());
 
-                // Split content by newlines so each line renders correctly
-                let output_lines: Vec<(String, bool)> = content
-                    .split('\n')
-                    .map(|l| (l.to_string(), false))
-                    .filter(|(l, _)| !l.trim().is_empty())
-                    .collect();
-                let output_lines = if output_lines.is_empty() {
-                    vec![(content.clone(), false)]
-                } else {
-                    output_lines
-                };
+                if let Some(user_entry) = self.claw_history.iter_mut().find(|e| e.id == user_entry_id) {
+                    user_entry.status = ClawEntryStatus::Success;
+                    user_entry.elapsed_ms = Some(latency_ms);
+                }
 
-                let new_entry_id = self.claw_next_id;
+                let id = self.claw_next_id;
                 self.claw_next_id += 1;
-                self.claw_history.push(ClawEntry {
-                    id: new_entry_id,
-                    command: format!("🤖 {}", agent_name),
-                    timestamp: std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_secs())
-                        .unwrap_or(0),
-                    source: ClawEntrySource::OpenClaw,
-                    status: ClawEntryStatus::Success,
-                    output_lines,
-                    elapsed_ms: Some(latency_ms),
-                });
+                self.claw_history.push(ClawEntry::reply(
+                    id,
+                    format!("[{}]", agent_name),
+                    ClawEntrySource::OpenClaw,
+                    content.split('\n').map(|l| (l.to_string(), false)).collect(),
+                    latency_ms,
+                ));
                 return iced_scrollable::snap_to(
                     CLAW_SCROLL_ID.clone(),
                     RelativeOffset { x: 0.0, y: 1.0 },
-                );
+                )
+                .map(cosmic::Action::App);
             }
             AppMessage::ClawNlPlanError { entry_id, error } => {
                 if let Some(entry) = self.claw_history.iter_mut().find(|e| e.id == entry_id) {
@@ -4662,6 +5179,7 @@ impl cosmic::Application for OpenClawApp {
                     entry.status = ClawEntryStatus::Error(1);
                     entry.elapsed_ms = Some(0);
                 }
+// ... (rest of the code remains the same)
             }
             AppMessage::ClawNlPlanReady { entry_id, plan_json } => {
                 // Parse the JSON plan and execute each step sequentially
@@ -5158,6 +5676,52 @@ impl cosmic::Application for OpenClawApp {
             )
         });
 
+        let maybe_claw_stream_sub = self.claw_agent_stream_rx.as_ref().map(|rx_arc| {
+            let rx_arc2 = rx_arc.clone();
+            Subscription::run_with_id(
+                "claw_agent_stream",
+                cosmic::iced_futures::stream::channel(
+                    128,
+                    move |mut output| async move {
+                        let receiver = rx_arc2.lock().await.clone();
+                        loop {
+                            match receiver.recv_async().await {
+                                Ok(ev) => {
+                                    let _ = output.try_send(AppMessage::ClawAgentStream {
+                                        user_entry_id: ev.user_entry_id,
+                                        reply_entry_id: ev.reply_entry_id,
+                                        agent_id: ev.agent_id,
+                                        delta: ev.delta,
+                                        done: ev.done,
+                                        ok: ev.ok,
+                                        elapsed_ms: ev.elapsed_ms,
+                                    });
+                                }
+                                Err(_) => break,
+                            }
+                        }
+                    },
+                ),
+            )
+        });
+
+        let maybe_cursor_tick_sub = if self.claw_agent_stream_tasks.is_empty() {
+            None
+        } else {
+            Some(Subscription::run_with_id(
+                "claw_cursor_tick",
+                cosmic::iced_futures::stream::channel(
+                    8,
+                    move |mut output| async move {
+                        loop {
+                            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                            let _ = output.try_send(AppMessage::ClawCursorTick);
+                        }
+                    },
+                ),
+            ))
+        };
+
         if let Some(rx_arc) = &self.event_rx {
             let rx_arc = rx_arc.clone();
             let sandbox_sub = Subscription::run_with_id(
@@ -5180,16 +5744,201 @@ impl cosmic::Application for OpenClawApp {
                     },
                 ),
             );
-            if let Some(exec_sub) = maybe_exec_sub {
-                Subscription::batch([keyboard_sub, sandbox_sub, exec_sub])
-            } else {
-                Subscription::batch([keyboard_sub, sandbox_sub])
+            match (maybe_exec_sub, maybe_claw_stream_sub, maybe_cursor_tick_sub) {
+                (Some(exec_sub), Some(claw_sub), Some(tick_sub)) => Subscription::batch([keyboard_sub, sandbox_sub, exec_sub, claw_sub, tick_sub]),
+                (Some(exec_sub), Some(claw_sub), None) => Subscription::batch([keyboard_sub, sandbox_sub, exec_sub, claw_sub]),
+                (Some(exec_sub), None, Some(tick_sub)) => Subscription::batch([keyboard_sub, sandbox_sub, exec_sub, tick_sub]),
+                (Some(exec_sub), None, None) => Subscription::batch([keyboard_sub, sandbox_sub, exec_sub]),
+                (None, Some(claw_sub), Some(tick_sub)) => Subscription::batch([keyboard_sub, sandbox_sub, claw_sub, tick_sub]),
+                (None, Some(claw_sub), None) => Subscription::batch([keyboard_sub, sandbox_sub, claw_sub]),
+                (None, None, Some(tick_sub)) => Subscription::batch([keyboard_sub, sandbox_sub, tick_sub]),
+                (None, None, None) => Subscription::batch([keyboard_sub, sandbox_sub]),
             }
         } else if let Some(exec_sub) = maybe_exec_sub {
-            Subscription::batch([keyboard_sub, exec_sub])
+            match (maybe_claw_stream_sub, maybe_cursor_tick_sub) {
+                (Some(claw_sub), Some(tick_sub)) => Subscription::batch([keyboard_sub, exec_sub, claw_sub, tick_sub]),
+                (Some(claw_sub), None) => Subscription::batch([keyboard_sub, exec_sub, claw_sub]),
+                (None, Some(tick_sub)) => Subscription::batch([keyboard_sub, exec_sub, tick_sub]),
+                (None, None) => Subscription::batch([keyboard_sub, exec_sub]),
+            }
+        } else if let Some(claw_sub) = maybe_claw_stream_sub {
+            if let Some(tick_sub) = maybe_cursor_tick_sub {
+                Subscription::batch([keyboard_sub, claw_sub, tick_sub])
+            } else {
+                Subscription::batch([keyboard_sub, claw_sub])
+            }
+        } else if let Some(tick_sub) = maybe_cursor_tick_sub {
+            Subscription::batch([keyboard_sub, tick_sub])
         } else {
             keyboard_sub
         }
+    }
+}
+
+#[cfg(test)]
+mod claw_stream_tests {
+    use super::*;
+
+    #[test]
+    fn claw_apply_stream_delta_updates_reply_entry_incrementally() {
+        let mut history = vec![
+            ClawEntry::new(1, "user"),
+            ClawEntry {
+                id: 2,
+                command: "[agent]".to_string(),
+                timestamp: 0,
+                output_lines: vec![(String::new(), false)],
+                status: ClawEntryStatus::Running,
+                elapsed_ms: None,
+                source: ClawEntrySource::OpenClaw,
+            },
+        ];
+        let mut buffers = std::collections::HashMap::new();
+
+        claw_apply_agent_stream_delta(&mut history, &mut buffers, true, 1, 2, "hel", false, true, 10);
+        assert_eq!(buffers.get(&2).cloned().unwrap_or_default(), "hel");
+        assert_eq!(history[1].output_lines[0].0, "hel▍");
+        assert!(matches!(history[1].status, ClawEntryStatus::Running));
+
+        claw_apply_agent_stream_delta(&mut history, &mut buffers, true, 1, 2, "lo", true, true, 12);
+        assert_eq!(buffers.get(&2).cloned().unwrap_or_default(), "hello");
+        assert_eq!(history[1].output_lines[0].0, "hello");
+        assert!(matches!(history[1].status, ClawEntryStatus::Success));
+        assert_eq!(history[1].elapsed_ms, Some(12));
+        assert!(matches!(history[0].status, ClawEntryStatus::Success));
+    }
+
+    #[tokio::test]
+    async fn claw_latest_running_stream_picks_max_id() {
+        let mut tasks: std::collections::HashMap<u64, tokio::task::JoinHandle<()>> = std::collections::HashMap::new();
+        tasks.insert(3, tokio::spawn(async {}));
+        tasks.insert(10, tokio::spawn(async {}));
+        tasks.insert(7, tokio::spawn(async {}));
+        assert_eq!(claw_latest_running_stream_user_entry_id(&tasks), Some(10));
+        for (_, h) in tasks {
+            h.abort();
+        }
+    }
+
+    #[test]
+    fn claw_stop_by_reply_maps_to_user_entry_id() {
+        let mut map = std::collections::HashMap::new();
+        map.insert(11, 101);
+        map.insert(12, 102);
+        assert_eq!(claw_user_entry_id_for_reply_entry_id(&map, 101), Some(11));
+        assert_eq!(claw_user_entry_id_for_reply_entry_id(&map, 102), Some(12));
+        assert_eq!(claw_user_entry_id_for_reply_entry_id(&map, 999), None);
+    }
+
+    #[test]
+    fn claw_cursor_tick_refresh_toggles_cursor_without_mutating_buffer() {
+        let mut history = vec![
+            ClawEntry::new(1, "user"),
+            ClawEntry {
+                id: 2,
+                command: "[agent]".to_string(),
+                timestamp: 0,
+                output_lines: vec![(String::new(), false)],
+                status: ClawEntryStatus::Running,
+                elapsed_ms: None,
+                source: ClawEntrySource::OpenClaw,
+            },
+        ];
+
+        let mut buffers = std::collections::HashMap::new();
+        buffers.insert(2, "hello".to_string());
+        let mut reply_map = std::collections::HashMap::new();
+        reply_map.insert(1, 2);
+
+        claw_refresh_stream_display(&mut history, &buffers, &reply_map, true);
+        assert_eq!(history[1].output_lines[0].0, "hello▍");
+        assert_eq!(buffers.get(&2).cloned().unwrap_or_default(), "hello");
+
+        claw_refresh_stream_display(&mut history, &buffers, &reply_map, false);
+        assert_eq!(history[1].output_lines[0].0, "hello");
+        assert_eq!(buffers.get(&2).cloned().unwrap_or_default(), "hello");
+    }
+
+    #[test]
+    fn claw_stream_delta_multiline_emptyline_trailing_newline_and_cursor_refresh() {
+        let mut history = vec![
+            ClawEntry::new(1, "user"),
+            ClawEntry {
+                id: 2,
+                command: "[agent]".to_string(),
+                timestamp: 0,
+                output_lines: vec![(String::new(), false)],
+                status: ClawEntryStatus::Running,
+                elapsed_ms: None,
+                source: ClawEntrySource::OpenClaw,
+            },
+        ];
+
+        let mut buffers = std::collections::HashMap::new();
+        let mut reply_map = std::collections::HashMap::new();
+        reply_map.insert(1, 2);
+
+        claw_apply_agent_stream_delta(&mut history, &mut buffers, true, 1, 2, "a\n\nb\n", false, true, 10);
+        assert_eq!(buffers.get(&2).cloned().unwrap_or_default(), "a\n\nb\n");
+        assert_eq!(history[1].output_lines.len(), 4);
+        assert_eq!(history[1].output_lines[0].0, "a");
+        assert_eq!(history[1].output_lines[1].0, "");
+        assert_eq!(history[1].output_lines[2].0, "b");
+        assert_eq!(history[1].output_lines[3].0, "▍");
+
+        claw_refresh_stream_display(&mut history, &buffers, &reply_map, false);
+        assert_eq!(buffers.get(&2).cloned().unwrap_or_default(), "a\n\nb\n");
+        assert_eq!(history[1].output_lines[3].0, "");
+
+        claw_refresh_stream_display(&mut history, &buffers, &reply_map, true);
+        assert_eq!(buffers.get(&2).cloned().unwrap_or_default(), "a\n\nb\n");
+        assert_eq!(history[1].output_lines[3].0, "▍");
+
+        claw_apply_agent_stream_delta(&mut history, &mut buffers, true, 1, 2, "c", true, true, 12);
+        assert_eq!(buffers.get(&2).cloned().unwrap_or_default(), "a\n\nb\nc");
+        assert_eq!(history[1].output_lines[3].0, "c");
+        assert!(matches!(history[1].status, ClawEntryStatus::Success));
+        assert_eq!(history[1].elapsed_ms, Some(12));
+        assert!(matches!(history[0].status, ClawEntryStatus::Success));
+        assert_eq!(history[0].elapsed_ms, Some(12));
+    }
+
+    #[test]
+    fn claw_pick_valid_selected_agent_id_prefers_existing_else_first() {
+        let agent_a = openclaw_security::AgentProfile::new(
+            "Agent A",
+            openclaw_security::AgentRole::default(),
+            "local",
+            "test",
+        );
+        let agent_b = openclaw_security::AgentProfile::new(
+            "Agent B",
+            openclaw_security::AgentRole::default(),
+            "local",
+            "test",
+        );
+        let agents = vec![agent_a.clone(), agent_b.clone()];
+
+        assert_eq!(
+            claw_pick_valid_selected_agent_id(Some(agent_b.id.as_str()), &agents),
+            Some(agent_b.id.as_str().to_string())
+        );
+        assert_eq!(
+            claw_pick_valid_selected_agent_id(Some("missing-agent"), &agents),
+            Some(CLAW_SUPER_AGENT_ID.to_string())
+        );
+        assert_eq!(
+            claw_pick_valid_selected_agent_id(None, &agents),
+            Some(CLAW_SUPER_AGENT_ID.to_string())
+        );
+        assert_eq!(
+            claw_pick_valid_selected_agent_id(Some(CLAW_SUPER_AGENT_ID), &agents),
+            Some(CLAW_SUPER_AGENT_ID.to_string())
+        );
+        assert_eq!(
+            claw_pick_valid_selected_agent_id(None, &[]),
+            Some(CLAW_SUPER_AGENT_ID.to_string())
+        );
     }
 }
 
@@ -5206,7 +5955,206 @@ fn provider_to_backend_kind(provider: &AiProvider) -> BackendKind {
     }
 }
 
+fn claw_pick_valid_selected_agent_id(
+    selected_agent_id: Option<&str>,
+    agent_list: &[openclaw_security::AgentProfile],
+) -> Option<String> {
+    if let Some(selected_id) = selected_agent_id {
+        if selected_id == CLAW_SUPER_AGENT_ID {
+            return Some(selected_id.to_string());
+        }
+        if agent_list.iter().any(|agent| agent.id.as_str() == selected_id) {
+            return Some(selected_id.to_string());
+        }
+    }
+
+    Some(CLAW_SUPER_AGENT_ID.to_string())
+}
+
+fn claw_agent_display_name(
+    selected_agent_id: Option<&str>,
+    agent_list: &[openclaw_security::AgentProfile],
+) -> String {
+    match selected_agent_id {
+        Some(CLAW_SUPER_AGENT_ID) | None => CLAW_SUPER_AGENT_NAME.to_string(),
+        Some(selected_id) => agent_list
+            .iter()
+            .find(|agent| agent.id.as_str() == selected_id)
+            .map(|agent| agent.display_name.clone())
+            .unwrap_or_else(|| CLAW_SUPER_AGENT_NAME.to_string()),
+    }
+}
+
+/// 从用户消息中提取位置信息
+/// 策略：提取"天气"/"weather"前的内容作为城市名，并翻译为英文供 wttr.in API 使用
+fn extract_location_from_message(message: &str) -> String {
+    let msg_lower = message.to_lowercase();
+    
+    // 优先查找"天气"前的内容
+    let mut location = String::new();
+    if let Some(pos) = msg_lower.find("天气") {
+        let before = message[..pos].trim();
+        if !before.is_empty() {
+            location = before.to_string();
+        }
+    }
+    
+    // 查找"weather"前的内容
+    if location.is_empty() {
+        if let Some(pos) = msg_lower.find("weather") {
+            let before = message[..pos].trim();
+            if !before.is_empty() {
+                location = before.to_string();
+            }
+        }
+    }
+    
+    // 如果没有找到"天气"或"weather"，移除常见问句词汇后提取
+    if location.is_empty() {
+        let noise_words = ["怎么样", "如何", "今天", "明天", "today", "tomorrow", 
+                           "的", "是", "吗", "呢", "啊", "？", "?", "what", "how", "is", "the"];
+        
+        let mut cleaned = message.to_string();
+        for word in &noise_words {
+            cleaned = cleaned.replace(word, " ");
+        }
+        
+        let cleaned = cleaned.trim();
+        if !cleaned.is_empty() && cleaned.len() >= 2 {
+            location = cleaned.to_string();
+        }
+    }
+    
+    // 如果还是空，默认返回北京
+    if location.is_empty() {
+        tracing::warn!("[LOCATION] Could not extract location from '{}', using default: Beijing", message);
+        return "Beijing".to_string();
+    }
+    
+    // 翻译中文地名为英文（wttr.in API 不支持中文）
+    let translated = translate_location_to_english(&location);
+    tracing::debug!("[LOCATION] Extracted '{}' -> translated to '{}'", location, translated);
+    translated
+}
+
+/// 将常见的中文地名翻译为英文
+fn translate_location_to_english(location: &str) -> String {
+    let location_lower = location.to_lowercase();
+    
+    // 城市列表（优先匹配）
+    let cities = [
+        // 中国城市
+        ("北京", "Beijing"),
+        ("上海", "Shanghai"),
+        ("广州", "Guangzhou"),
+        ("深圳", "Shenzhen"),
+        ("杭州", "Hangzhou"),
+        ("南京", "Nanjing"),
+        ("成都", "Chengdu"),
+        ("重庆", "Chongqing"),
+        ("武汉", "Wuhan"),
+        ("西安", "Xian"),
+        ("天津", "Tianjin"),
+        ("苏州", "Suzhou"),
+        
+        // 欧洲城市
+        ("柏林", "Berlin"),
+        ("慕尼黑", "Munich"),
+        ("法兰克福", "Frankfurt"),
+        ("汉堡", "Hamburg"),
+        ("巴黎", "Paris"),
+        ("伦敦", "London"),
+        ("罗马", "Rome"),
+        ("马德里", "Madrid"),
+        ("阿姆斯特丹", "Amsterdam"),
+        ("布鲁塞尔", "Brussels"),
+        ("维也纳", "Vienna"),
+        ("苏黎世", "Zurich"),
+        
+        // 亚洲城市
+        ("东京", "Tokyo"),
+        ("首尔", "Seoul"),
+        ("新加坡", "Singapore"),
+        ("曼谷", "Bangkok"),
+        ("吉隆坡", "Kuala Lumpur"),
+        
+        // 美洲城市
+        ("纽约", "New York"),
+        ("洛杉矶", "Los Angeles"),
+        ("旧金山", "San Francisco"),
+        ("芝加哥", "Chicago"),
+        ("多伦多", "Toronto"),
+        ("温哥华", "Vancouver"),
+        
+        // 大洋洲城市
+        ("悉尼", "Sydney"),
+        ("墨尔本", "Melbourne"),
+    ];
+    
+    // 优先查找城市名（如果输入是"德国柏林"，优先提取"柏林"）
+    for (chinese, english) in &cities {
+        if location_lower.contains(chinese) {
+            tracing::debug!("[TRANSLATE] Found city '{}' in '{}', translating to '{}'", chinese, location, english);
+            return english.to_string();
+        }
+    }
+    
+    // 如果没有找到城市，检查国家名
+    let countries = [
+        ("德国", "Germany"),
+        ("法国", "France"),
+        ("英国", "UK"),
+        ("美国", "USA"),
+        ("日本", "Japan"),
+        ("韩国", "South Korea"),
+        ("中国", "China"),
+    ];
+    
+    for (chinese, english) in &countries {
+        if location_lower.contains(chinese) {
+            tracing::debug!("[TRANSLATE] Found country '{}' in '{}', translating to '{}'", chinese, location, english);
+            return english.to_string();
+        }
+    }
+    
+    // 如果没有匹配的翻译，返回原始位置
+    tracing::debug!("[TRANSLATE] No translation found for '{}', using as-is", location);
+    location.to_string()
+}
+
 impl OpenClawApp {
+    fn ensure_claw_terminal_chat_ready(&mut self) {
+        if self.claw_agent_list.is_empty() {
+            self.claw_agent_list = openclaw_security::AgentProfile::list_all();
+            tracing::info!("[CLAW] Loaded {} agents", self.claw_agent_list.len());
+        }
+
+        if self.claw_agent_list.is_empty() {
+            let mut default_agent = openclaw_security::AgentProfile::new(
+                "Local Assistant",
+                openclaw_security::AgentRole::default(),
+                "local",
+                "ui",
+            );
+            default_agent.description = "Default local agent for Claw Terminal chat".to_string();
+            match default_agent.save() {
+                Ok(()) => {
+                    tracing::info!(agent_id = %default_agent.id, "[CLAW] Default AgentProfile created");
+                    self.claw_agent_list.push(default_agent);
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "[CLAW] Failed to save default AgentProfile");
+                }
+            }
+        }
+
+        // Force default to Super OpenClaw unless already explicitly set
+        if self.claw_selected_agent_id.is_none() {
+            self.claw_selected_agent_id = Some(CLAW_SUPER_AGENT_ID.to_string());
+            tracing::info!("[CLAW] Defaulted to Super OpenClaw");
+        }
+    }
+
     /// Load all built-in skills from agent-executor.
     /// Converts agent-executor's Skill definitions to UI's SkillInfo format.
     fn load_builtin_skills() -> Vec<crate::pages::skills::SkillInfo> {

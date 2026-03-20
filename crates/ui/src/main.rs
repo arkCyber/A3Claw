@@ -5,10 +5,13 @@ mod env_check;
 mod i18n;
 mod icons;
 mod ipc_client;
+mod markdown_parser;
+mod news_tool;
 mod pages;
 mod tooltip_helper;
 mod widgets;
 mod theme;
+mod weather_tool;
 
 use app::OpenClawApp;
 use tracing_subscriber::EnvFilter;
@@ -38,7 +41,7 @@ fn main() -> cosmic::iced::Result {
         .expect("open /tmp/openclaw.log");
     let writer = SyncFileWriter(std::sync::Mutex::new(log_file));
     let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("openclaw_ui=info"));
+        .unwrap_or_else(|_| EnvFilter::new("openclaw_ui=debug"));
     tracing_subscriber::fmt()
         .with_env_filter(filter)
         .with_writer(writer)

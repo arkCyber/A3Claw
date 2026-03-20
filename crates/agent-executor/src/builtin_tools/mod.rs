@@ -9,6 +9,7 @@ pub mod apply_patch;
 pub mod browser;
 pub mod exec;
 pub mod web_fetch;
+pub mod news_fetch;
 pub mod image;
 pub mod cron;
 pub mod cron_scheduler;
