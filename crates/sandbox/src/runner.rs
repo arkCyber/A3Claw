@@ -133,10 +133,7 @@ impl SandboxRunner {
         info!("WASI module created with {} preopens", wasi_args.preopens.len());
 
         // ── Step 6: Build security host functions import object ──────
-        let host_ctx = HostContext {
-            interceptor: self.interceptor.clone(),
-            runtime: tokio::runtime::Handle::current(),
-        };
+        let host_ctx = HostContext::new(self.interceptor.clone());
         let mut security_import = build_import_object(host_ctx)
             .context("Failed to build security import object")?;
         info!("Security host functions built (ocplus: check_file_read/write/delete/network/shell)");

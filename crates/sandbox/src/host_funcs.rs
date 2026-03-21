@@ -26,7 +26,10 @@
 use anyhow::{Context, Result};
 use openclaw_security::{InterceptResult, Interceptor};
 use std::sync::Arc;
-use tracing::{debug, warn};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+use tracing::{debug, warn, error};
 use wasmedge_sdk::{
     CallingFrame,
     ImportObjectBuilder,
@@ -44,6 +47,10 @@ use wasmedge_sdk::{
 pub struct HostContext {
     pub interceptor: Arc<Interceptor>,
     pub runtime: tokio::runtime::Handle,
+    /// Rate limiting: tracks the number of security checks per second
+    check_count: Arc<AtomicU64>,
+    /// Last reset time for rate limiting
+    last_reset: Arc<Mutex<Instant>>,
 }
 
 impl HostContext {
@@ -52,20 +59,59 @@ impl HostContext {
         Self {
             interceptor,
             runtime: tokio::runtime::Handle::current(),
+            check_count: Arc::new(AtomicU64::new(100)), // <--- updated initialization
+            last_reset: Arc::new(Mutex::new(Instant::now())),
+        }
+    }
+
+    /// Checks rate limit before processing security check.
+    /// Returns true if within rate limit, false if exceeded.
+    fn check_rate_limit(&self) -> bool {
+        const MAX_CHECKS_PER_SECOND: u64 = 1000;
+        
+        let count = self.check_count.fetch_add(1, Ordering::Relaxed);
+        
+        if count > MAX_CHECKS_PER_SECOND {
+            let mut last_reset = self.last_reset.lock().unwrap();
+            if last_reset.elapsed() >= Duration::from_secs(1) {
+                // Reset counter
+                *last_reset = Instant::now();
+                self.check_count.store(0, Ordering::Relaxed);
+                true
+            } else {
+                warn!("Rate limit exceeded: {} checks/sec", count);
+                false
+            }
+        } else {
+            true
         }
     }
 
     /// Drives an async interception call to completion on the current Tokio
     /// runtime, blocking the calling thread until the policy decision is made.
     ///
+    /// Includes timeout protection and rate limiting.
     /// Returns `1` for [`InterceptResult::Allow`] and `0` for [`InterceptResult::Deny`].
     fn sync_check<F, Fut>(&self, f: F) -> i32
     where
         F: FnOnce(Arc<Interceptor>) -> Fut,
         Fut: std::future::Future<Output = InterceptResult>,
     {
+        if !self.check_rate_limit() {
+            return 0;
+        }
         let interceptor = self.interceptor.clone();
-        let result = self.runtime.block_on(f(interceptor));
+        let timeout_duration = Duration::from_secs(5);
+        let result = self.runtime.block_on(async {
+            match tokio::time::timeout(timeout_duration, f(interceptor)).await {
+                Ok(r) => r,
+                Err(_) => {
+                    error!("Security check timed out after 5 seconds");
+                    InterceptResult::Deny("Security check timeout".to_string())
+                }
+            }
+        });
+        
         match result {
             InterceptResult::Allow => 1,
             InterceptResult::Deny(_) => 0,
@@ -114,7 +160,23 @@ impl HostContext {
 /// # Parameters
 /// - `ptr` — byte offset of the string in WASM memory (linear memory index 0).
 /// - `len` — byte length of the string.
+///
+/// # Security
+/// - Validates pointer and length are non-negative
+/// - Enforces maximum string length (1MB)
+/// - Validates UTF-8 encoding
 fn read_wasm_string(frame: &CallingFrame, ptr: i32, len: i32) -> Result<String> {
+    // Boundary checks
+    if ptr < 0 {
+        anyhow::bail!("Invalid WASM pointer: {} (must be non-negative)", ptr);
+    }
+    if len < 0 {
+        anyhow::bail!("Invalid WASM length: {} (must be non-negative)", len);
+    }
+    if len > 1_000_000 {
+        anyhow::bail!("WASM string too large: {} bytes (max 1MB)", len);
+    }
+    
     let mem = frame
         .memory_ref(0)
         .context("Failed to access WASM linear memory")?;

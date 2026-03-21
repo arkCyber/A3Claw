@@ -5,3 +5,5 @@ pub mod wasi_builder;
 pub mod node_mock;
 pub mod ipc;
 pub mod agent_sandbox;
+#[cfg(feature = "wasm-sandbox")]
+pub mod quickjs_compat;
