@@ -87,8 +87,13 @@ run_wasmedge_test() {
         return
     fi
     
-    # 执行 WasmEdge 测试
-    if output=$(wasmedge --dir .:. "$quickjs_wasm" "$temp_js" 2>&1); then
+    # 执行 WasmEdge 测试 (使用 0.14.1 版本)
+    local wasmedge_bin="wasmedge"
+    if [ -f "$HOME/.wasmedge/bin/wasmedge" ]; then
+        wasmedge_bin="$HOME/.wasmedge/bin/wasmedge"
+    fi
+    
+    if output=$($wasmedge_bin --dir .:. "$quickjs_wasm" "$temp_js" 2>&1); then
         if echo "$output" | grep -q "$expected_pattern"; then
             PASSED_TESTS=$((PASSED_TESTS + 1))
             echo -e "${GREEN}✓ 通过${NC}"
@@ -228,25 +233,25 @@ run_test \
 # 测试 15: 基础 JavaScript 执行
 run_wasmedge_test \
     "基础 JavaScript 计算" \
-    "console.log(1 + 1);" \
+    'console.log(1 + 1);' \
     "2"
 
 # 测试 16: 字符串操作
 run_wasmedge_test \
     "JavaScript 字符串操作" \
-    "console.log('Hello'.toUpperCase());" \
+    'console.log("Hello".toUpperCase());' \
     "HELLO"
 
 # 测试 17: 数组操作
 run_wasmedge_test \
     "JavaScript 数组操作" \
-    "console.log([1,2,3].map(x => x * 2).join(','));" \
+    'console.log([1,2,3].map(x => x * 2).join(","));' \
     "2,4,6"
 
 # 测试 18: JSON 处理
 run_wasmedge_test \
     "JavaScript JSON 处理" \
-    "console.log(JSON.stringify({name: 'test', value: 42}));" \
+    'console.log(JSON.stringify({name: "test", value: 42}));' \
     "test.*42"
 
 echo -e "${MAGENTA}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
