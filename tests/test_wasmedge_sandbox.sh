@@ -36,7 +36,25 @@ PASSED_TESTS=0
 FAILED_TESTS=0
 
 WORKSPACE_DIR="${HOME}/.openclaw-plus/workspace"
-WASMEDGE_QUICKJS="/opt/homebrew/Cellar/wasmedge/0.14.1/lib/wasmedge/libwasmedge_quickjs.dylib"
+
+find_quickjs_runtime() {
+    local candidates=(
+        "${PROJECT_ROOT}/assets/wasmedge_quickjs.wasm"
+        "${HOME}/.local/share/openclaw-plus/wasmedge_quickjs.wasm"
+        "/usr/share/openclaw-plus/wasmedge_quickjs.wasm"
+    )
+
+    for candidate in "${candidates[@]}"; do
+        if [ -f "${candidate}" ]; then
+            echo "${candidate}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+WASMEDGE_QUICKJS="$(find_quickjs_runtime || true)"
 
 # ============================================================================
 # 测试 1: WasmEdge 环境检查
@@ -56,11 +74,11 @@ fi
 TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
 log_info "检查 WasmEdge QuickJS 库"
-if [ -f "${WASMEDGE_QUICKJS}" ]; then
-    log_ok "WasmEdge QuickJS 库存在"
+if [ -n "${WASMEDGE_QUICKJS}" ] && [ -f "${WASMEDGE_QUICKJS}" ]; then
+    log_ok "WasmEdge QuickJS 运行时存在: ${WASMEDGE_QUICKJS}"
     PASSED_TESTS=$((PASSED_TESTS + 1))
 else
-    log_error "WasmEdge QuickJS 库不存在: ${WASMEDGE_QUICKJS}"
+    log_error "WasmEdge QuickJS 运行时不存在（已检查项目 assets 与标准安装位置）"
     FAILED_TESTS=$((FAILED_TESTS + 1))
 fi
 TOTAL_TESTS=$((TOTAL_TESTS + 1))
@@ -92,7 +110,7 @@ console.log("String test: " + "OpenClaw");
 EOF
 
 log_info "运行简单 JavaScript 测试"
-if OUTPUT=$(wasmedge --dir /workspace:"${WORKSPACE_DIR}" "${WASMEDGE_QUICKJS}" "${TEST_JS}" 2>&1); then
+if [ -n "${WASMEDGE_QUICKJS}" ] && OUTPUT=$(wasmedge --dir /workspace:"${WORKSPACE_DIR}" "${WASMEDGE_QUICKJS}" "${TEST_JS}" 2>&1); then
     if echo "${OUTPUT}" | grep -q "Hello from WasmEdge QuickJS"; then
         log_ok "简单 JavaScript 执行成功"
         echo "  输出: ${OUTPUT}"
@@ -149,7 +167,7 @@ console.log("[TEST] 文件系统测试完成");
 EOF
 
 log_info "运行文件系统测试"
-if OUTPUT=$(wasmedge --dir /workspace:"${WORKSPACE_DIR}" "${WASMEDGE_QUICKJS}" "${TEST_JS}" 2>&1); then
+if [ -n "${WASMEDGE_QUICKJS}" ] && OUTPUT=$(wasmedge --dir /workspace:"${WORKSPACE_DIR}" "${WASMEDGE_QUICKJS}" "${TEST_JS}" 2>&1); then
     if echo "${OUTPUT}" | grep -q "文件写入成功" && echo "${OUTPUT}" | grep -q "文件读取成功"; then
         log_ok "文件系统操作成功"
         PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -258,7 +276,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 cd "${PROJECT_ROOT}"
 
 log_info "运行 sandbox crate 单元测试"
-if cargo test -p sandbox --lib 2>&1 | tail -20 | grep -q "test result: ok\|running 0 tests"; then
+if cargo test -p openclaw-sandbox --lib 2>&1 | tail -20 | grep -q "test result: ok\|running 0 tests"; then
     log_ok "sandbox 单元测试通过"
     PASSED_TESTS=$((PASSED_TESTS + 1))
 else

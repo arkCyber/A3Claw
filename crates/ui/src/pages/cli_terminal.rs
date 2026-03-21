@@ -555,4 +555,112 @@ mod tests {
         state.apply_autocomplete();
         assert_eq!(state.command_input, "help");
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 命令执行集成测试 (Command Execution Integration Tests)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_command_list_completeness() {
+        let state = CliTerminalState::default();
+        let expected_commands = vec![
+            "help", "version", "status", "clear",
+            "agent", "agent list", "agent info",
+            "gateway", "gateway status", "gateway url",
+            "ai", "ai model", "ai status",
+            "weather", "news", "sysinfo", "uptime", "whoami", "pwd", "env",
+        ];
+        
+        for cmd in expected_commands {
+            assert!(
+                state.available_commands.contains(&cmd.to_string()),
+                "Command '{}' should be in available_commands",
+                cmd
+            );
+        }
+    }
+
+    #[test]
+    fn test_autocomplete_all_commands() {
+        let test_cases = vec![
+            ("hel", Some("help")),
+            ("ver", Some("version")),
+            ("sta", Some("status")),
+            ("age", Some("agent")),
+            ("agent l", Some("agent list")),
+            ("gate", Some("gateway")),
+            ("gateway s", Some("gateway status")),
+            ("ai m", Some("ai model")),
+            ("wea", Some("weather")),
+            ("new", Some("news")),
+            ("sys", Some("sysinfo")),
+            ("xyz", None),
+        ];
+
+        for (input, expected) in test_cases {
+            let mut state = CliTerminalState::default();
+            state.command_input = input.to_string();
+            state.update_autocomplete();
+            
+            assert_eq!(
+                state.autocomplete_suggestion.as_deref(),
+                expected,
+                "Autocomplete for '{}' failed",
+                input
+            );
+        }
+    }
+
+    #[test]
+    fn test_command_with_arguments() {
+        let mut state = CliTerminalState::default();
+        
+        state.command_input = "weather beijing".to_string();
+        assert!(state.validate_input().is_ok());
+        
+        state.command_input = "weather new york".to_string();
+        assert!(state.validate_input().is_ok());
+        
+        state.command_input = "echo hello world".to_string();
+        assert!(state.validate_input().is_ok());
+    }
+
+    #[test]
+    fn test_multiline_output_handling() {
+        let mut state = CliTerminalState::default();
+        state.history.clear();
+        
+        let entry = CliHistoryEntry {
+            command: "help".to_string(),
+            output: vec![
+                ("Line 1".to_string(), false),
+                ("Line 2".to_string(), false),
+                ("Line 3".to_string(), false),
+            ],
+            timestamp: 0,
+        };
+        
+        state.add_to_history(entry);
+        assert_eq!(state.history.len(), 1);
+        assert_eq!(state.history[0].output.len(), 3);
+    }
+
+    #[test]
+    fn test_error_output_format() {
+        let mut state = CliTerminalState::default();
+        state.history.clear();
+        
+        let entry = CliHistoryEntry {
+            command: "invalid".to_string(),
+            output: vec![
+                ("Error: Command not found".to_string(), true),
+                ("Hint: Type 'help'".to_string(), false),
+            ],
+            timestamp: 0,
+        };
+        
+        state.add_to_history(entry);
+        assert!(state.history[0].output[0].1); // Error flag
+        assert!(!state.history[0].output[1].1); // Not error
+    }
 }

@@ -95,10 +95,10 @@ impl Default for AssistantConfig {
     fn default() -> Self {
         Self {
             endpoint: "http://localhost:11434".to_string(),
-            model: "qwen2:7b".to_string(),
+            model: "qwen3.5:9b".to_string(),
             rag_path: String::new(),
-            temperature_str: "0.7".to_string(),
-            top_k_str: "40".to_string(),
+            temperature_str: "0.6".to_string(),
+            top_k_str: "50".to_string(),
             rag_items: Vec::new(),
         }
     }
@@ -1190,6 +1190,7 @@ impl AssistantPage {
                 // Build merged model list: loaded models first, then static presets
                 // not already in the list
                 const PRESET_MODELS: &[&str] = &[
+                    "qwen3.5:9b",
                     "qwen2:7b", "qwen2.5:7b", "qwen2.5:14b", "qwen2.5:32b",
                     "llama3.1:8b", "llama3.1:70b", "llama3.2:3b",
                     "mistral:7b", "deepseek-r1:7b", "deepseek-r1:14b",
@@ -1431,7 +1432,7 @@ mod tests {
     #[test]
     fn preset_models_follow_name_tag_format() {
         const PRESETS: &[&str] = &[
-            "qwen2:7b", "qwen2.5:7b", "llama3.1:8b", "mistral:7b",
+            "qwen3.5:9b", "qwen2:7b", "qwen2.5:7b", "llama3.1:8b", "mistral:7b",
             "deepseek-r1:7b", "phi3:mini", "gemma2:9b", "codellama:7b",
         ];
         for m in PRESETS {

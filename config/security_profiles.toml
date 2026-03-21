@@ -1,0 +1,293 @@
+# OpenClaw+ Security Profiles Configuration
+# 
+# Defines security profiles for different execution environments.
+# Each profile specifies resource limits, allowed capabilities, and security policies.
+#
+# Version: 1.0.0
+# Standard: Aerospace-grade security
+
+# Default security profile - balanced security and functionality
+[default]
+name = "default"
+description = "Default security profile with balanced restrictions"
+
+# Memory limits
+max_memory_mb = 512
+max_stack_size_mb = 8
+
+# CPU limits
+max_cpu_percent = 80
+max_execution_time_sec = 300
+
+# File system capabilities
+[default.filesystem]
+read_allowed = true
+write_allowed = true
+delete_allowed = false
+max_file_size_mb = 10
+allowed_extensions = [".txt", ".json", ".log", ".md", ".csv", ".yaml", ".toml"]
+blocked_paths = ["/etc", "/sys", "/proc", "/root", "/boot"]
+
+# Allowed mount points (WASI pre-opened directories)
+[[default.filesystem.mounts]]
+host_path = "/tmp"
+guest_path = "/tmp"
+readonly = false
+
+[[default.filesystem.mounts]]
+host_path = "./data"
+guest_path = "/data"
+readonly = false
+
+# Network capabilities
+[default.network]
+enabled = false
+http_allowed = false
+https_allowed = false
+allowed_domains = []
+max_connections = 0
+timeout_sec = 30
+
+# Process capabilities
+[default.process]
+spawn_allowed = false
+exec_allowed = false
+signal_allowed = false
+
+# Security policies
+[default.security]
+audit_logging = true
+policy_enforcement = "strict"
+intercept_all_calls = true
+deny_by_default = true
+
+# Allowed security capabilities
+allowed_capabilities = [
+    "fs_read",
+    "fs_write",
+    "fs_stat"
+]
+
+# ============================================================================
+# Restricted profile - maximum security, minimal capabilities
+[restricted]
+name = "restricted"
+description = "Highly restricted profile for untrusted code"
+
+max_memory_mb = 128
+max_stack_size_mb = 2
+
+max_cpu_percent = 50
+max_execution_time_sec = 60
+
+[restricted.filesystem]
+read_allowed = true
+write_allowed = false
+delete_allowed = false
+max_file_size_mb = 1
+allowed_extensions = [".txt", ".json"]
+blocked_paths = ["/etc", "/sys", "/proc", "/root", "/boot", "/home", "/usr"]
+
+[[restricted.filesystem.mounts]]
+host_path = "/tmp/sandbox"
+guest_path = "/sandbox"
+readonly = true
+
+[restricted.network]
+enabled = false
+http_allowed = false
+https_allowed = false
+allowed_domains = []
+max_connections = 0
+
+[restricted.process]
+spawn_allowed = false
+exec_allowed = false
+signal_allowed = false
+
+[restricted.security]
+audit_logging = true
+policy_enforcement = "strict"
+intercept_all_calls = true
+deny_by_default = true
+
+allowed_capabilities = ["fs_read"]
+
+# ============================================================================
+# Development profile - relaxed restrictions for development
+[development]
+name = "development"
+description = "Development profile with relaxed restrictions"
+
+max_memory_mb = 1024
+max_stack_size_mb = 16
+
+max_cpu_percent = 100
+max_execution_time_sec = 600
+
+[development.filesystem]
+read_allowed = true
+write_allowed = true
+delete_allowed = true
+max_file_size_mb = 50
+allowed_extensions = [
+    ".txt", ".json", ".log", ".md", ".csv", ".yaml", ".toml",
+    ".js", ".ts", ".py", ".rs", ".go", ".java", ".c", ".cpp"
+]
+blocked_paths = ["/etc", "/sys", "/proc", "/root", "/boot"]
+
+[[development.filesystem.mounts]]
+host_path = "/tmp"
+guest_path = "/tmp"
+readonly = false
+
+[[development.filesystem.mounts]]
+host_path = "./data"
+guest_path = "/data"
+readonly = false
+
+[[development.filesystem.mounts]]
+host_path = "./workspace"
+guest_path = "/workspace"
+readonly = false
+
+[development.network]
+enabled = true
+http_allowed = true
+https_allowed = true
+allowed_domains = [
+    "api.github.com",
+    "httpbin.org",
+    "jsonplaceholder.typicode.com",
+    "localhost"
+]
+max_connections = 10
+timeout_sec = 60
+
+[development.process]
+spawn_allowed = false
+exec_allowed = false
+signal_allowed = false
+
+[development.security]
+audit_logging = true
+policy_enforcement = "permissive"
+intercept_all_calls = true
+deny_by_default = false
+
+allowed_capabilities = [
+    "fs_read",
+    "fs_write",
+    "fs_delete",
+    "fs_stat",
+    "net_http",
+    "net_https"
+]
+
+# ============================================================================
+# Production profile - strict security for production environments
+[production]
+name = "production"
+description = "Production profile with strict security"
+
+max_memory_mb = 512
+max_stack_size_mb = 8
+
+max_cpu_percent = 70
+max_execution_time_sec = 180
+
+[production.filesystem]
+read_allowed = true
+write_allowed = true
+delete_allowed = false
+max_file_size_mb = 5
+allowed_extensions = [".txt", ".json", ".log", ".csv"]
+blocked_paths = ["/etc", "/sys", "/proc", "/root", "/boot", "/home", "/usr"]
+
+[[production.filesystem.mounts]]
+host_path = "/var/openclaw/data"
+guest_path = "/data"
+readonly = false
+
+[[production.filesystem.mounts]]
+host_path = "/var/openclaw/logs"
+guest_path = "/logs"
+readonly = false
+
+[production.network]
+enabled = true
+http_allowed = false
+https_allowed = true
+allowed_domains = [
+    "api.production.example.com"
+]
+max_connections = 5
+timeout_sec = 30
+
+[production.process]
+spawn_allowed = false
+exec_allowed = false
+signal_allowed = false
+
+[production.security]
+audit_logging = true
+policy_enforcement = "strict"
+intercept_all_calls = true
+deny_by_default = true
+
+allowed_capabilities = [
+    "fs_read",
+    "fs_write",
+    "fs_stat",
+    "net_https"
+]
+
+# ============================================================================
+# Testing profile - for automated testing
+[testing]
+name = "testing"
+description = "Testing profile for automated tests"
+
+max_memory_mb = 256
+max_stack_size_mb = 4
+
+max_cpu_percent = 100
+max_execution_time_sec = 120
+
+[testing.filesystem]
+read_allowed = true
+write_allowed = true
+delete_allowed = true
+max_file_size_mb = 10
+allowed_extensions = [".txt", ".json", ".log", ".test"]
+blocked_paths = []
+
+[[testing.filesystem.mounts]]
+host_path = "/tmp/test"
+guest_path = "/test"
+readonly = false
+
+[testing.network]
+enabled = false
+http_allowed = false
+https_allowed = false
+allowed_domains = []
+max_connections = 0
+
+[testing.process]
+spawn_allowed = false
+exec_allowed = false
+signal_allowed = false
+
+[testing.security]
+audit_logging = false
+policy_enforcement = "permissive"
+intercept_all_calls = false
+deny_by_default = false
+
+allowed_capabilities = [
+    "fs_read",
+    "fs_write",
+    "fs_delete",
+    "fs_stat"
+]

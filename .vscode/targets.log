@@ -6,8 +6,11 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # PARTICULAR PURPOSE.
 
 # This program built for i386-apple-darwin11.3.0
+ 
+make: *** No rule to make target `all'.  Stop.
 
-# Make data base, printed on Fri Mar 13 14:21:50 2026
+
+# Make data base, printed on Sat Mar 21 09:40:26 2026
 
 # Variables
 
@@ -22,6 +25,7 @@ VSCODE_CRASH_REPORTER_PROCESS_TYPE = extensionHost
 # environment
 NVM_INC = /Users/arkSong/.nvm/versions/node/v22.13.1/include/node
 # automatic
+ 
 ?D = $(patsubst %/,%,$(dir $?))
 # automatic
 @D = $(patsubst %/,%,$(dir $@))
@@ -54,7 +58,7 @@ APP_BUNDLE := /tmp/OpenClawStore.app
 # environment
 PATH = /Users/arkSong/.codeium/windsurf/bin:/Users/arkSong/Library/pnpm:/Users/arkSong/.bun/bin:/opt/homebrew/opt/llvm/bin:/usr/local/opt/llvm/bin:/Users/arkSong/.nvm/versions/node/v22.13.1/bin:/opt/homebrew/opt/libiconv/bin:/Users/arkSong/miniconda3/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pmk/env/global/bin:/opt/X11/bin:/Library/Apple/usr/bin:/opt/podman/bin:/Users/arkSong/.cargo/bin:/Users/arkSong/.wasmedge/bin:/Users/arkSong/Library/Application Support/JetBrains/Toolbox/scripts:/Users/arkSong/.local/bin:/Users/arkSong/.lmstudio/bin:/Users/arkSong/.local/bin:/Applications/Docker.app/Contents/Resources/bin
 # environment
-LOG_DST = /Users/arkSong/Library/Application Support/Windsurf/logs/20260313T142052/window1/exthost/dendron.dendron/dendron.log
+LOG_DST = /Users/arkSong/Library/Application Support/Windsurf/logs/20260321T093939/window1/exthost/dendron.dendron/dendron.log
 # environment
 C_INCLUDE_PATH = /Users/arkSong/.wasmedge/include
 # environment
@@ -66,21 +70,19 @@ NVM_BIN = /Users/arkSong/.nvm/versions/node/v22.13.1/bin
 # environment
 LOG_LEVEL = info
 # environment
-LaunchInstanceID = C7B35556-3E90-4157-9D2E-5D45A8D50D4E
-# environment
 ELECTRON_RUN_AS_NODE = 1
 # makefile (from `Makefile', line 24)
 PORT := 54321
 # default
 .FEATURES := target-specific order-only second-expansion else-if archives jobserver check-symlink
 # environment
-SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.6JG4Pzudif/Listeners
+SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.WFSYuyiCL7/Listeners
 # environment
 CPLUS_INCLUDE_PATH = /Users/arkSong/.wasmedge/include
 # automatic
 %F = $(notdir $%)
 # environment
-DISPLAY = /private/tmp/com.apple.launchd.RVHT4G3g9c/org.xquartz:0
+DISPLAY = /private/tmp/com.apple.launchd.dhVNDGVKhJ/org.xquartz:0
 # environment
 PWD = /Users/arkSong/workspace/OpenClaw+
 # environment
@@ -96,7 +98,7 @@ VSCODE_CODE_CACHE_PATH = /Users/arkSong/Library/Application Support/Windsurf/Cac
 # environment
 LOGNAME = zhiliangyang
 # environment
-APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = 1
+APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = true
 # environment
 NVM_CD_FLAGS = -q
 # environment
@@ -155,8 +157,6 @@ XPC_SERVICE_NAME = application.com.exafunction.windsurf.174908524.174908530
 HOMEBREW_PREFIX = /opt/homebrew
 # automatic
 +D = $(patsubst %/,%,$(dir $+))
-# environment
-VSCODE_L10N_BUNDLE_LOCATION = 
 # automatic
 +F = $(notdir $+)
 # environment
@@ -173,8 +173,6 @@ DETECTED_OS := macos
 <F = $(notdir $<)
 # environment
 LC_ALL = C
-# environment
-SECURITYSESSIONID = 186b8
 # automatic
 ^F = $(notdir $^)
 # default
@@ -190,9 +188,9 @@ LANG = C
 # makefile (from `Makefile', line 25)
 REGISTRY := /Users/arkSong/workspace/OpenClaw+/registry/index.json
 # environment
-VSCODE_PID = 721
+VSCODE_PID = 3170
 # variable set hash-table stats:
-# Load=90/1024=9%, Rehash=0, Collisions=2/124=2%
+# Load=87/1024=8%, Rehash=0, Collisions=2/121=2%
 
 # Pattern-specific Variable Values
 
@@ -200,9 +198,9 @@ VSCODE_PID = 721
 
 # Directories
 
-# . (device 16777233, inode 172390459): 133 files, no impossibilities.
+# . (device 16777229, inode 172390459): 89 files, no impossibilities.
 
-# 133 files, no impossibilities in 1 directories.
+# 89 files, no impossibilities in 1 directories.
 
 # Implicit Rules
 
@@ -249,6 +247,7 @@ all:
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
+ 
 
 macos-app: build
 #  Phony target (prerequisite of .PHONY).
@@ -449,8 +448,6 @@ check:
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
 
-# Finished Make data base on Fri Mar 13 14:21:50 2026
+# Finished Make data base on Sat Mar 21 09:40:26 2026
 
  
-make: *** No rule to make target `all'.  Stop.
-

@@ -28,8 +28,6 @@ use openclaw_security::{InterceptResult, Interceptor};
 use std::sync::Arc;
 use tracing::{debug, warn};
 use wasmedge_sdk::{
-    error::HostFuncError,
-    host_function,
     CallingFrame,
     ImportObjectBuilder,
     WasmValue,
@@ -137,56 +135,59 @@ fn read_wasm_string(frame: &CallingFrame, ptr: i32, len: i32) -> Result<String> 
 ///
 /// Return value: `1` = allowed, `0` = denied.
 pub fn build_import_object(ctx: HostContext) -> Result<wasmedge_sdk::ImportObject<HostContext>> {
-    let ctx_read = ctx.clone();
-    let ctx_write = ctx.clone();
-    let ctx_delete = ctx.clone();
-    let ctx_network = ctx.clone();
-    let ctx_shell = ctx.clone();
+    let mut import = ImportObjectBuilder::new("ocplus", ctx)
+        .context("Failed to create ImportObjectBuilder")?;
 
-    let import = ImportObjectBuilder::new("ocplus", ctx)
-        // ── File read check ───────────────────────────────────────────
-        .with_func::<(i32, i32), i32, HostContext>(
+    // ── File read check ───────────────────────────────────────────
+    import
+        .with_func::<(i32, i32), i32>(
             "check_file_read",
-            move |_ctx_ref, frame, args| {
+            |data: &mut HostContext, _inst, frame: &mut CallingFrame, args: Vec<WasmValue>| {
                 let ptr = args[0].to_i32();
                 let len = args[1].to_i32();
                 let path = read_wasm_string(&frame, ptr, len)
                     .unwrap_or_else(|_| "<invalid utf8>".to_string());
-                let result = ctx_read.check_file_read(&path);
+                let result = data.check_file_read(&path);
                 Ok(vec![WasmValue::from_i32(result)])
             },
         )
-        .context("Failed to register check_file_read")?
-        // ── File write check ──────────────────────────────────────────
-        .with_func::<(i32, i32), i32, HostContext>(
+        .context("Failed to register check_file_read")?;
+
+    // ── File write check ──────────────────────────────────────────
+    import
+        .with_func::<(i32, i32), i32>(
             "check_file_write",
-            move |_ctx_ref, frame, args| {
+            |data: &mut HostContext, _inst, frame: &mut CallingFrame, args: Vec<WasmValue>| {
                 let ptr = args[0].to_i32();
                 let len = args[1].to_i32();
                 let path = read_wasm_string(&frame, ptr, len)
                     .unwrap_or_else(|_| "<invalid utf8>".to_string());
-                let result = ctx_write.check_file_write(&path);
+                let result = data.check_file_write(&path);
                 Ok(vec![WasmValue::from_i32(result)])
             },
         )
-        .context("Failed to register check_file_write")?
-        // ── File delete check ─────────────────────────────────────────
-        .with_func::<(i32, i32), i32, HostContext>(
+        .context("Failed to register check_file_write")?;
+
+    // ── File delete check ─────────────────────────────────────────
+    import
+        .with_func::<(i32, i32), i32>(
             "check_file_delete",
-            move |_ctx_ref, frame, args| {
+            |data: &mut HostContext, _inst, frame: &mut CallingFrame, args: Vec<WasmValue>| {
                 let ptr = args[0].to_i32();
                 let len = args[1].to_i32();
                 let path = read_wasm_string(&frame, ptr, len)
                     .unwrap_or_else(|_| "<invalid utf8>".to_string());
-                let result = ctx_delete.check_file_delete(&path);
+                let result = data.check_file_delete(&path);
                 Ok(vec![WasmValue::from_i32(result)])
             },
         )
-        .context("Failed to register check_file_delete")?
-        // ── Network request check ─────────────────────────────────────
-        .with_func::<(i32, i32, i32, i32), i32, HostContext>(
+        .context("Failed to register check_file_delete")?;
+
+    // ── Network request check ─────────────────────────────────────
+    import
+        .with_func::<(i32, i32, i32, i32), i32>(
             "check_network",
-            move |_ctx_ref, frame, args| {
+            |data: &mut HostContext, _inst, frame: &mut CallingFrame, args: Vec<WasmValue>| {
                 let host_ptr = args[0].to_i32();
                 let host_len = args[1].to_i32();
                 let url_ptr  = args[2].to_i32();
@@ -195,25 +196,26 @@ pub fn build_import_object(ctx: HostContext) -> Result<wasmedge_sdk::ImportObjec
                     .unwrap_or_default();
                 let url = read_wasm_string(&frame, url_ptr, url_len)
                     .unwrap_or_default();
-                let result = ctx_network.check_network(&host, &url);
+                let result = data.check_network(&host, &url);
                 Ok(vec![WasmValue::from_i32(result)])
             },
         )
-        .context("Failed to register check_network")?
-        // ── Shell execution check ─────────────────────────────────────
-        .with_func::<(i32, i32), i32, HostContext>(
+        .context("Failed to register check_network")?;
+
+    // ── Shell execution check ─────────────────────────────────────
+    import
+        .with_func::<(i32, i32), i32>(
             "check_shell",
-            move |_ctx_ref, frame, args| {
+            |data: &mut HostContext, _inst, frame: &mut CallingFrame, args: Vec<WasmValue>| {
                 let ptr = args[0].to_i32();
                 let len = args[1].to_i32();
                 let cmd = read_wasm_string(&frame, ptr, len)
                     .unwrap_or_else(|_| "<invalid utf8>".to_string());
-                let result = ctx_shell.check_shell_exec(&cmd);
+                let result = data.check_shell_exec(&cmd);
                 Ok(vec![WasmValue::from_i32(result)])
             },
         )
-        .context("Failed to register check_shell")?
-        .build();
+        .context("Failed to register check_shell")?;
 
-    Ok(import)
+    Ok(import.build())
 }
