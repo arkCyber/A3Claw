@@ -12,8 +12,8 @@ type = "ollama"
 endpoint = "http://localhost:11434"
 port = 11434
 enabled = true
-auto_start = false  # Ollama 需要手动启动
-model = "qwen2.5:0.5b"
+auto_start = false                  # Ollama 需要手动启动
+model = "qwen3.5:9b"
 
 [[servers]]
 id = "llama-cpp-backup"
@@ -22,7 +22,7 @@ type = "llama_cpp"
 endpoint = "http://localhost:8080"
 port = 8080
 enabled = true
-auto_start = true  # 可以自动启动
+auto_start = true                                            # 可以自动启动
 model_path = "models/gguf/qwen2.5-0.5b-instruct-q4_k_m.gguf"
 threads = 8
 
@@ -32,7 +32,7 @@ name = "OpenAI (云端)"
 type = "openai"
 endpoint = "https://api.openai.com/v1"
 port = 443
-enabled = false  # 默认禁用，需要 API key
+enabled = false                        # 默认禁用，需要 API key
 auto_start = false
 model = "gpt-3.5-turbo"
 # api_key 从环境变量 OPENAI_API_KEY 读取
@@ -43,18 +43,30 @@ name = "DeepSeek (云端)"
 type = "deepseek"
 endpoint = "https://api.deepseek.com/v1"
 port = 443
-enabled = false  # 默认禁用，需要 API key
+enabled = false                          # 默认禁用，需要 API key
 auto_start = false
 model = "deepseek-chat"
 # api_key 从环境变量 DEEPSEEK_API_KEY 读取
+
+[[servers]]
+id = "zhipu-cloud"
+name = "智谱AI (云端)"
+type = "zhipu"
+endpoint = "https://open.bigmodel.cn/api/paas/v4"
+port = 443
+enabled = false                                   # 默认禁用，需要 API key
+auto_start = false
+model = "glm-4-flash"
+# api_key 从环境变量 ZHIPU_API_KEY 读取
+# 您的API Key: 3a27cba615f24a979fef006b3cb2487f.mXxpSoA7Vd0NDyUk
 
 # ============================================================================
 # 健康检查配置
 # ============================================================================
 [health_check]
-interval_seconds = 30  # 每 30 秒检查一次
-timeout_seconds = 5    # 超时时间
-retry_count = 3        # 重试次数
+interval_seconds = 30 # 每 30 秒检查一次
+timeout_seconds = 5   # 超时时间
+retry_count = 3       # 重试次数
 
 # ============================================================================
 # 故障转移配置
@@ -66,7 +78,7 @@ priority = [
     "ollama-primary",
     "llama-cpp-backup",
     "deepseek-cloud",
-    "openai-cloud"
+    "openai-cloud",
 ]
 
 # ============================================================================
@@ -74,6 +86,6 @@ priority = [
 # ============================================================================
 [monitoring]
 enabled = true
-update_interval_seconds = 5  # 每 5 秒更新资源使用情况
+update_interval_seconds = 5                      # 每 5 秒更新资源使用情况
 log_to_file = true
 log_path = "~/.openclaw-plus/server-monitor.log"

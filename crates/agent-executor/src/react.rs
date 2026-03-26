@@ -78,7 +78,7 @@ impl Default for ReactConfig {
     fn default() -> Self {
         Self {
             llm_endpoint: "http://localhost:11434".to_string(),
-            model: "qwen2.5:0.5b".to_string(),
+            model: "qwen3.5:9b".to_string(),
             api_key: String::new(),
             temperature: 0.2,
             max_tokens: 2048,
@@ -240,6 +240,7 @@ impl LlmClient {
 
         let mut req = self.client.post(&url).json(&payload);
         if !self.cfg.api_key.is_empty() {
+            // 智谱AI使用Bearer认证，与OpenAI兼容
             req = req.bearer_auth(&self.cfg.api_key);
         }
 

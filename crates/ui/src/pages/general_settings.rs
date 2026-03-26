@@ -83,7 +83,7 @@ impl GeneralSettingsPage {
                         widget::text(s.set_model_hint).size(11)
                             .class(cosmic::theme::Text::Color(color_muted)).into(),
                     ]).spacing(2).width(Length::Fill).into(),
-                    widget::text_input("qwen2.5:0.5b", ai_model)
+                    widget::text_input("qwen3.5:9b", ai_model)
                         .on_input(AppMessage::AiModelChanged)
                         .width(Length::Fixed(200.0)).into(),
                 ]).spacing(12).align_y(Alignment::Center).into(),
@@ -327,14 +327,16 @@ fn build_model_mgmt_section<'a>(
     });
 
     let recommended: &[(&str, &str, &str)] = &[
-        ("qwen2.5:0.5b",   "0.5B · ~400MB",  "Fast, lightweight, great for testing"),
-        ("qwen2.5:7b",     "7B  · ~4.7GB",   "Balanced performance and quality"),
-        ("llama3.2:3b",    "3B  · ~2.0GB",   "Meta's latest compact model"),
-        ("llama3.1:8b",    "8B  · ~4.9GB",   "Meta's flagship open model"),
+        ("qwen3.5:9b",    "9B  · ~6.6GB",   "High performance, multilingual support"),
+        ("qwen2.5:7b",    "7B  · ~4.7GB",   "Balanced performance and quality"),
+        ("llama3.2:3b",   "3B  · ~2.0GB",   "Meta's latest compact model"),
+        ("llama3.2:latest", "3B  · ~2.0GB", "Meta's latest model"),
         ("deepseek-r1:7b", "7B  · ~4.7GB",   "Strong reasoning capabilities"),
-        ("mistral:7b",     "7B  · ~4.1GB",   "Fast and efficient European model"),
-        ("phi4:14b",       "14B · ~8.9GB",   "Microsoft's high-quality model"),
-        ("gemma3:4b",      "4B  · ~3.3GB",   "Google's efficient small model"),
+        ("mistral:7b",    "7B  · ~4.1GB",   "Fast and efficient European model"),
+        ("phi4:14b",      "14B · ~8.9GB",   "Microsoft's high-quality model"),
+        ("gemma3:4b",     "4B  · ~3.3GB",   "Google's efficient small model"),
+        ("glm-4-flash",   "云端API",        "智谱AI高速推理模型"),
+        ("glm-4",         "云端API",        "智谱AI高性能大模型"),
     ];
 
     let rec_cards: Vec<Element<AppMessage>> = recommended.iter().map(|(name, size_hint, desc)| {

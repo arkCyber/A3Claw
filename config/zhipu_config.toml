@@ -1,0 +1,40 @@
+# 智谱AI专用配置文件
+# 可以通过此文件快速配置智谱AI参数
+
+[zhipu]
+# API配置
+endpoint = "https://open.bigmodel.cn/api/paas/v4"
+api_key = "3a27cba615f24a979fef006b3cb2487f.mXxpSoA7Vd0NDyUk"
+model = "glm-4-flash"
+
+# 模型参数
+temperature = 0.2
+max_tokens = 2048
+timeout_seconds = 120
+
+# 支持的模型列表
+[[zhipu.models]]
+name = "glm-4-flash"
+description = "高速推理模型"
+speed = "fast"
+quality = "good"
+cost = "low"
+
+[[zhipu.models]]
+name = "glm-4"
+description = "高性能大模型"
+speed = "medium"
+quality = "excellent"
+cost = "high"
+
+# 使用限制
+[zhipu.limits]
+max_requests_per_minute = 60
+max_tokens_per_minute = 100000
+max_concurrent_requests = 5
+
+# 错误重试配置
+[zhipu.retry]
+max_retries = 3
+retry_delay_seconds = 1
+backoff_multiplier = 2
