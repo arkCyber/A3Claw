@@ -37,13 +37,13 @@ brew install ollama
 ollama serve
 
 # 3. 下载模型
-ollama pull qwen2.5:0.5b
+ollama pull qwen3.5:9b
 
 # 4. 配置 OpenClaw+ 使用 Ollama
 # 在 InferenceConfig 中设置：
 #   backend: BackendKind::Ollama
 #   endpoint: "http://localhost:11434"
-#   model_name: "qwen2.5:0.5b"
+#   model_name: "qwen3.5:9b"
 ```
 
 ### 架构图

@@ -18,15 +18,12 @@ confirm_network = true
 confirm_shell_exec = true
 
 # 网络白名单
-network_allowlist = [
-    "api.openai.com",
-    "api.github.com"
-]
+network_allowlist = ["api.openai.com", "api.github.com"]
 
 # AI 配置
 [agent.ai_config]
 endpoint = "http://localhost:11434"
-model_name = "qwen2.5:0.5b"
+model_name = "qwen3.5:9b"
 max_tokens = 1024
 temperature = 0.6
 system_prompt = """你是一个专业的报告生成专家，精通各类商业报告、技术文档和总结撰写。

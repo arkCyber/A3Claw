@@ -1,1 +1,1 @@
-{"buildTargets":["build","build-linux","build-windows","check","clean","clippy","fmt","gateway","help","macos-app","run","smoke","store","test"],"launchTargets":[],"customConfigurationProvider":{"workspaceBrowse":{"browsePath":[],"compilerArgs":[]},"fileIndex":[]}}
+{"buildTargets":["build","build-linux","build-ui","build-windows","check","clean","clippy","fmt","gateway","help","macos-app","run","smoke","store","test","ui","ui-app","ui-open"],"launchTargets":[],"customConfigurationProvider":{"workspaceBrowse":{"browsePath":[],"compilerArgs":[]},"fileIndex":[]}}

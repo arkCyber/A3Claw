@@ -56,7 +56,7 @@ pub static RU: Strings = Strings {
     set_endpoint: "URL конечной точки",
     set_endpoint_hint: "Базовый URL, совместимый с Ollama / OpenAI",
     set_model: "Название модели",
-    set_model_hint: "напр. qwen2.5:0.5b, llama3.2:1b",
+    set_model_hint: "напр. qwen3.5:9b, llama3.2:latest",
     set_sandbox: "Ограничения ресурсов",
     set_sandbox_sub: "Конфигурация памяти и путей для песочницы.",
     set_memory: "Ограничение памяти",

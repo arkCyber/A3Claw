@@ -8,8 +8,8 @@ backend = "ollama"
 # Ollama endpoint (default: http://localhost:11434)
 endpoint = "http://localhost:11434"
 
-# Model name as registered in Ollama
-model_name = "qwen2.5:0.5b"
+# Model name as registered in Ollama (默认使用 qwen3.5:9b)
+model_name = "qwen3.5:9b"
 
 # Generation parameters
 max_tokens = 512

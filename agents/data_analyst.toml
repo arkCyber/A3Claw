@@ -22,13 +22,13 @@ network_allowlist = [
     "api.openai.com",
     "api.github.com",
     "data.gov",
-    "kaggle.com"
+    "kaggle.com",
 ]
 
 # AI 配置
 [agent.ai_config]
 endpoint = "http://localhost:11434"
-model_name = "qwen2.5:0.5b"
+model_name = "qwen3.5:9b"
 max_tokens = 1024
 temperature = 0.4
 system_prompt = """你是一个专业的数据分析师，精通统计学、数据可视化和商业智能。

@@ -635,7 +635,7 @@ impl TooltipTexts {
         ("Ollama API endpoint URL", "Ollama API 接口地址");
     
     pub const AI_MODEL: (&'static str, &'static str) = 
-        ("AI model name (e.g., qwen2.5:0.5b)", "AI 模型名称（如 qwen2.5:0.5b）");
+        ("AI model name (e.g., qwen3.5:9b)", "AI 模型名称（如 qwen3.5:9b）");
 
     // Claw Terminal tooltips
     pub const CLAW_NL_MODE: (&'static str, &'static str) = 

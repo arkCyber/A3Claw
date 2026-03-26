@@ -22,7 +22,7 @@ brew install ollama
 ollama serve
 
 # 下载模型
-ollama pull qwen2.5:0.5b
+ollama pull qwen3.5:9b
 
 # 验证
 curl http://localhost:11434/api/tags
@@ -110,7 +110,7 @@ All tests passed! 🎉
 # 主服务：Ollama
 backend = "Ollama"
 endpoint = "http://localhost:11434"
-model_name = "qwen2.5:0.5b"
+model_name = "qwen3.5:9b"
 max_tokens = 256
 temperature = 0.7
 inference_timeout_secs = 30
@@ -231,7 +231,7 @@ kill -9 <PID>
 ls -lh models/gguf/
 
 # 重新下载模型
-ollama pull qwen2.5:0.5b
+ollama pull qwen3.5:9b
 ```
 
 ### Q: 如何切换到备份服务？

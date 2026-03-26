@@ -101,7 +101,7 @@ brew install ollama
 ollama serve
 
 # Pull a model (in another terminal)
-ollama pull qwen2.5:0.5b
+ollama pull qwen3.5:9b
 ollama pull llama3.2:1b
 ollama pull gemma2:2b
 ```
@@ -112,7 +112,7 @@ ollama pull gemma2:2b
 let config = InferenceConfig {
     backend: BackendKind::Ollama,
     endpoint: "http://localhost:11434".into(),
-    model_name: "qwen2.5:0.5b".into(),  // Use Ollama model name
+    model_name: "qwen3.5:9b".into(),  // Use Ollama model name
     
     api_key: None,
     inference_timeout: std::time::Duration::from_secs(120),

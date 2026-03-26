@@ -115,13 +115,13 @@ curl http://localhost:11434/api/tags
 ```bash
 # 简单测试
 curl http://localhost:11434/api/generate -d '{
-  "model": "qwen2.5:0.5b",
+  "model": "qwen3.5:9b",
   "prompt": "Hello, how are you?",
   "stream": false
 }'
 
 # 或使用 ollama 命令
-ollama run qwen2.5:0.5b "Hello, how are you?"
+ollama run qwen3.5:9b "Hello, how are you?"
 ```
 
 #### 5.2 在 UI 中测试 AI Chat

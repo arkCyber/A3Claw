@@ -112,60 +112,91 @@ gateway: build
 	$(GATEWAY) --port $(PORT)
 
 # ── Store UI launch (platform-specific) ───────────────────────────────────────
+# ⚠️  DEPRECATED: openclaw-store is the OLD UI - DO NOT USE
+# ✅  Use 'make ui' or 'make ui-app' for the NEW UI with CLI Terminal sidebar
 
 # macOS: wrap in a .app bundle so Metal / window focus works correctly.
 .PHONY: macos-app
 macos-app: build
+	@echo "⚠️  WARNING: This is the OLD UI (openclaw-store)"
+	@echo "✅  Please use 'make ui-app' for the NEW UI with CLI Terminal"
+	@echo ""
+	@echo "Continuing in 3 seconds... Press Ctrl+C to cancel"
+	@sleep 3
 	mkdir -p $(APP_BUNDLE)/Contents/MacOS $(APP_BUNDLE)/Contents/Resources
 	cp $(STORE) $(APP_BUNDLE)/Contents/MacOS/openclaw-store
 	@printf '#!/bin/bash\nexport OPENCLAW_GATEWAY_URL=http://127.0.0.1:$(PORT)\nexport CLAWPLUS_REGISTRY_URL=file://$(REGISTRY)\nexport RUST_LOG=info\nDIR="$$(cd "$$(dirname "$$0")" && pwd)"\nexec "$$DIR/openclaw-store" "$$@"\n' \
 		> $(APP_BUNDLE)/Contents/MacOS/openclaw-store-launcher
 	chmod +x $(APP_BUNDLE)/Contents/MacOS/openclaw-store-launcher
-	@printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>CFBundleExecutable</key><string>openclaw-store-launcher</string>\n<key>CFBundleIdentifier</key><string>dev.clawplus.store</string>\n<key>CFBundleName</key><string>OpenClaw+ Store</string>\n<key>CFBundlePackageType</key><string>APPL</string>\n<key>NSHighResolutionCapable</key><true/>\n<key>NSPrincipalClass</key><string>NSApplication</string>\n</dict></plist>\n' \
+	@printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>CFBundleExecutable</key><string>openclaw-store-launcher</string>\n<key>CFBundleIdentifier</key><string>dev.clawplus.store</string>\n<key>CFBundleName</key><string>OpenClaw+ Store (OLD)</string>\n<key>CFBundlePackageType</key><string>APPL</string>\n<key>NSHighResolutionCapable</key><true/>\n<key>NSPrincipalClass</key><string>NSApplication</string>\n</dict></plist>\n' \
 		> $(APP_BUNDLE)/Contents/Info.plist
-	@echo "App bundle ready: $(APP_BUNDLE)"
+	@echo "⚠️  OLD UI App bundle ready: $(APP_BUNDLE)"
 
 # Unified 'store' target — dispatches to the right launcher per OS.
+# ⚠️  DEPRECATED - Use 'make ui' instead
 .PHONY: store
-ifeq ($(DETECTED_OS),macos)
-store: macos-app
-	open -n $(APP_BUNDLE)
-else ifeq ($(DETECTED_OS),linux)
-store: build
-	@echo "Launching store UI on Linux…"
-	OPENCLAW_GATEWAY_URL=http://127.0.0.1:$(PORT) \
-	CLAWPLUS_REGISTRY_URL=file://$(REGISTRY) \
-	RUST_LOG=info \
-	$(STORE) &
-else ifeq ($(DETECTED_OS),windows)
-store: build
-	@echo "Launching store UI on Windows…"
-	@cmd /C "set OPENCLAW_GATEWAY_URL=http://127.0.0.1:$(PORT) && \
-	         set CLAWPLUS_REGISTRY_URL=file://$(REGISTRY) && \
-	         set RUST_LOG=info && \
-	         start $(STORE)"
-else
-store: build
-	@echo "Unknown OS — running store binary directly."
-	OPENCLAW_GATEWAY_URL=http://127.0.0.1:$(PORT) \
-	CLAWPLUS_REGISTRY_URL=file://$(REGISTRY) \
-	RUST_LOG=info \
-	$(STORE)
-endif
+store:
+	@echo "⚠️  ERROR: 'make store' is DEPRECATED (old UI)"
+	@echo "✅  Please use 'make ui' or 'make ui-app' for the NEW UI"
+	@echo ""
+	@echo "The new UI includes:"
+	@echo "  • CLI Terminal sidebar"
+	@echo "  • Improved interface"
+	@echo "  • Better performance"
+	@exit 1
 
-# ── Run (gateway + store together) ────────────────────────────────────────────
+# ── NEW UI (openclaw-plus) launch ─────────────────────────────────────────────
+# ✅  This is the CORRECT UI with CLI Terminal sidebar
+
+UI_BINARY := target/release/openclaw-plus
+UI_APP_BUNDLE := /tmp/OpenClawPlus.app
+
+# Build the new UI
+.PHONY: build-ui
+build-ui:
+	$(CARGO) build --release -p openclaw-ui
+
+# macOS: Create .app bundle for the NEW UI
+.PHONY: ui-app
+ui-app: build-ui
+	@echo "✅  Creating NEW UI .app bundle with CLI Terminal..."
+	mkdir -p $(UI_APP_BUNDLE)/Contents/MacOS $(UI_APP_BUNDLE)/Contents/Resources
+	cp $(UI_BINARY) $(UI_APP_BUNDLE)/Contents/MacOS/openclaw-plus
+	@printf '#!/bin/bash\nexport OPENCLAW_GATEWAY_URL=http://127.0.0.1:$(PORT)\nexport RUST_LOG=info\nDIR="$$(cd "$$(dirname "$$0")" && pwd)"\nexec "$$DIR/openclaw-plus" "$$@"\n' \
+		> $(UI_APP_BUNDLE)/Contents/MacOS/openclaw-plus-launcher
+	chmod +x $(UI_APP_BUNDLE)/Contents/MacOS/openclaw-plus-launcher
+	@printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>CFBundleExecutable</key><string>openclaw-plus-launcher</string>\n<key>CFBundleIdentifier</key><string>dev.clawplus.ui</string>\n<key>CFBundleName</key><string>OpenClaw+ UI</string>\n<key>CFBundlePackageType</key><string>APPL</string>\n<key>NSHighResolutionCapable</key><true/>\n<key>NSPrincipalClass</key><string>NSApplication</string>\n</dict></plist>\n' \
+		> $(UI_APP_BUNDLE)/Contents/Info.plist
+	@echo "✅  NEW UI App bundle ready: $(UI_APP_BUNDLE)"
+	@echo "    Features: CLI Terminal, AI Assistant, Security Dashboard"
+
+# Launch the NEW UI directly (non-bundle)
+.PHONY: ui
+ui: build-ui
+	@echo "✅  Launching NEW UI (openclaw-plus)..."
+	OPENCLAW_GATEWAY_URL=http://127.0.0.1:$(PORT) \
+	RUST_LOG=info \
+	$(UI_BINARY)
+
+# Launch NEW UI as .app bundle (macOS)
+.PHONY: ui-open
+ui-open: ui-app
+	@echo "✅  Opening NEW UI .app bundle..."
+	open -n $(UI_APP_BUNDLE)
+
+# ── Run (gateway + NEW UI together) ───────────────────────────────────────────
 
 .PHONY: run
 ifeq ($(DETECTED_OS),macos)
-run: macos-app
+run: ui-app
 	@echo "Starting plugin gateway on port $(PORT)…"
 	OPENCLAW_GATEWAY_URL=http://127.0.0.1:$(PORT) \
 	CLAWPLUS_REGISTRY_URL=file://$(REGISTRY) \
 	RUST_LOG=info \
 	$(GATEWAY) --port $(PORT) &
 	@sleep 1
-	@echo "Launching plugin store UI…"
-	open -n $(APP_BUNDLE)
+	@echo "✅  Launching NEW UI with CLI Terminal..."
+	open -n $(UI_APP_BUNDLE)
 else ifeq ($(DETECTED_OS),linux)
 run: build
 	@echo "Starting plugin gateway on port $(PORT)…"

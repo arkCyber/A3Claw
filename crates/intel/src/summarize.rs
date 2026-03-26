@@ -8,7 +8,7 @@ use serde_json::json;
 pub struct SummarizeConfig {
     /// Ollama endpoint, e.g. "http://localhost:11434"
     pub ollama_endpoint: String,
-    /// 模型名称, e.g. "qwen2.5:0.5b"
+    /// 模型名称, e.g. "qwen3.5:9b"
     pub model: String,
     /// 摘要语言提示词
     pub lang: SummarizeLang,
@@ -26,7 +26,7 @@ impl Default for SummarizeConfig {
     fn default() -> Self {
         Self {
             ollama_endpoint: "http://localhost:11434".to_string(),
-            model: "qwen2.5:0.5b".to_string(),
+            model: "qwen3.5:9b".to_string(),
             lang: SummarizeLang::Chinese,
             max_input_chars: 3000,
         }

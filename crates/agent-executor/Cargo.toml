@@ -22,9 +22,21 @@ dirs = { workspace = true }
 async-trait = "0.1"
 chrono = "0.4"
 
+# Email & Calendar (optional features - aerospace-grade)
+# Note: Email/Calendar use custom HTTP/protocol implementations for stability
+# imap/lettre/caldav crates are unstable, using reqwest-based custom impl
+qdrant-client = { version = "1.7", optional = true }
+
 openclaw-security = { path = "../security" }
 openclaw-storage = { path = "../storage" }
 openclaw-plugin-sdk = { path = "../plugin-sdk" }
+
+[features]
+default = []
+email = []                                 # Email via custom IMAP/SMTP over reqwest
+calendar = []                              # CalDAV via custom HTTP/WebDAV client
+rag-qdrant = ["qdrant-client"]
+full = ["email", "calendar", "rag-qdrant"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }

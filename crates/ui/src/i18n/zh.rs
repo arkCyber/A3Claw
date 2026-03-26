@@ -56,7 +56,7 @@ pub static ZH: Strings = Strings {
     set_endpoint:       "端点 URL",
     set_endpoint_hint:  "Ollama / OpenAI 兼容接口地址",
     set_model:          "模型名称",
-    set_model_hint:     "例如 qwen2.5:0.5b, llama3.2:1b",
+    set_model_hint:     "例如 qwen3.5:9b, llama3.2:latest",
     set_sandbox:        "沙箱资源限制",
     set_sandbox_sub:    "沙箱的内存与路径配置。",
     set_memory:         "内存限制",

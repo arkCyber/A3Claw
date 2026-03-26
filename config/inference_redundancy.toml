@@ -7,7 +7,7 @@
 [primary]
 backend = "ollama"
 endpoint = "http://localhost:11434"
-model_name = "qwen2.5:0.5b"
+model_name = "qwen3.5:9b"
 max_tokens = 2048
 temperature = 0.7
 top_p = 0.95

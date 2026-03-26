@@ -23,13 +23,13 @@ network_allowlist = [
     "cve.mitre.org",
     "api.github.com",
     "api.openai.com",
-    "rustsec.org"
+    "rustsec.org",
 ]
 
 # AI 配置
 [agent.ai_config]
 endpoint = "http://localhost:11434"
-model_name = "qwen2.5:0.5b"
+model_name = "qwen3.5:9b"
 max_tokens = 1024
 temperature = 0.2
 system_prompt = """你是一个专业的安全审计员，精通网络安全、应用安全和系统安全。

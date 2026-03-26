@@ -56,7 +56,7 @@ pub static ES: Strings = Strings {
     set_endpoint: "URL del endpoint",
     set_endpoint_hint: "URL base compatible con Ollama / OpenAI",
     set_model: "Nombre del modelo",
-    set_model_hint: "p.ej. qwen2.5:0.5b, llama3.2:1b",
+    set_model_hint: "p.ej. qwen3.5:9b, llama3.2:latest",
     set_sandbox: "Límites de recursos del sandbox",
     set_sandbox_sub: "Configuración de memoria y rutas del sandbox.",
     set_memory: "Límite de memoria",

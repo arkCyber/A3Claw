@@ -2,9 +2,9 @@
 
 use serde_json::json;
 
-/// 获取实时新闻
-pub async fn fetch_news(_source: &str, count: usize) -> Result<String, String> {
-    tracing::info!("[NEWS] Starting news fetch, count={}", count);
+/// 获取实时新闻 - 支持多语言、多来源
+pub async fn fetch_news(query: &str, count: usize) -> Result<String, String> {
+    tracing::info!("[NEWS] Starting news fetch, query='{}', count={}", query, count);
     
     let client = match reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
@@ -20,30 +20,111 @@ pub async fn fetch_news(_source: &str, count: usize) -> Result<String, String> {
             }
         };
 
-    let sources = vec![
-        ("https://lite.cnn.com/", "CNN Lite"),
-        ("https://text.npr.org/", "NPR Text"),
-        ("https://www.reuters.com/", "Reuters"),
-    ];
+    // 根据查询内容智能选择新闻源
+    let sources = select_news_sources(query);
+    tracing::info!("[NEWS] Selected {} news sources based on query", sources.len());
     
-    let mut last_error = String::new();
-    for (url, name) in sources {
-        tracing::info!("[NEWS] Trying source: {} ({})", name, url);
+    let mut all_news = Vec::new();
+    let mut successful_sources = Vec::new();
+    
+    // 尝试从多个来源获取新闻
+    for (url, name, lang) in sources {
+        tracing::info!("[NEWS] Trying source: {} ({}) [{}]", name, url, lang);
         match fetch_news_from_url(&client, url, name, count).await {
             Ok(news) => {
                 tracing::info!("[NEWS] Successfully fetched news from {}", name);
-                return Ok(news);
+                all_news.push((name.to_string(), news, lang.to_string()));
+                successful_sources.push(name);
+                
+                // 如果已经获取到足够的来源，可以提前返回
+                if successful_sources.len() >= 2 {
+                    break;
+                }
             }
             Err(e) => {
-                last_error = format!("{}: {}", name, e);
                 tracing::warn!("[NEWS] {} failed: {}", name, e);
                 continue;
             }
         }
     }
     
-    tracing::error!("[NEWS] All news sources failed. Last error: {}", last_error);
-    Err(format!("所有新闻源都失败了。最后错误: {}", last_error))
+    if all_news.is_empty() {
+        tracing::error!("[NEWS] All news sources failed");
+        return Err("所有新闻源都失败了，请稍后重试".to_string());
+    }
+    
+    // 格式化多来源新闻
+    format_multi_source_news(&all_news, query)
+}
+
+/// 根据查询内容智能选择新闻源
+fn select_news_sources(query: &str) -> Vec<(&'static str, &'static str, &'static str)> {
+    let query_lower = query.to_lowercase();
+    let mut sources = Vec::new();
+    
+    // 检测语言和地区
+    let is_chinese = query.chars().any(|c| (c as u32) > 0x4E00 && (c as u32) < 0x9FA5);
+    let is_german = query_lower.contains("德国") || query_lower.contains("germany") || query_lower.contains("german");
+    let is_us = query_lower.contains("美国") || query_lower.contains("us") || query_lower.contains("america");
+    let is_uk = query_lower.contains("英国") || query_lower.contains("uk") || query_lower.contains("britain");
+    
+    // 优先添加相关地区的新闻源
+    if is_german {
+        sources.push(("https://www.dw.com/en/top-stories/s-9097", "Deutsche Welle (DW)", "en"));
+        sources.push(("https://www.thelocal.de/", "The Local Germany", "en"));
+    }
+    
+    if is_chinese || (!is_german && !is_us && !is_uk) {
+        // 中文用户或默认情况，添加国际新闻源
+        sources.push(("https://lite.cnn.com/", "CNN Lite", "en"));
+        sources.push(("https://text.npr.org/", "NPR Text", "en"));
+    }
+    
+    if is_us {
+        sources.push(("https://lite.cnn.com/", "CNN Lite", "en"));
+        sources.push(("https://text.npr.org/", "NPR Text", "en"));
+    }
+    
+    if is_uk {
+        sources.push(("https://www.bbc.com/news", "BBC News", "en"));
+    }
+    
+    // 总是添加 Reuters 作为备选
+    sources.push(("https://www.reuters.com/", "Reuters", "en"));
+    
+    // 如果没有匹配到特定来源，使用默认国际新闻源
+    if sources.is_empty() {
+        sources.push(("https://lite.cnn.com/", "CNN Lite", "en"));
+        sources.push(("https://text.npr.org/", "NPR Text", "en"));
+        sources.push(("https://www.reuters.com/", "Reuters", "en"));
+    }
+    
+    sources
+}
+
+/// 格式化多来源新闻
+fn format_multi_source_news(
+    news_list: &[(String, String, String)],
+    query: &str,
+) -> Result<String, String> {
+    let mut result = String::new();
+    let now = chrono::Utc::now();
+    let time_str = now.format("%Y-%m-%d %H:%M").to_string();
+    
+    // 添加标题，显示用户的查询
+    result.push_str(&format!("\n📰 {} - 新闻汇总（{}）\n", query, time_str));
+    result.push_str(&format!("\n✅ 成功获取 {} 个新闻源\n", news_list.len()));
+    
+    // 显示每个来源的新闻
+    for (i, (source_name, news_content, _lang)) in news_list.iter().enumerate() {
+        result.push_str(&format!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"));
+        result.push_str(&format!("📌 来源 {}: {}\n", i + 1, source_name));
+        result.push_str(&format!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"));
+        result.push_str(news_content);
+        result.push_str("\n");
+    }
+    
+    Ok(result)
 }
 
 async fn fetch_news_from_url(

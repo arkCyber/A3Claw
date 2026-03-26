@@ -25,3 +25,7 @@ pub mod document;
 pub mod archive;
 pub mod data;
 pub mod clawhub;
+
+// Optional features (aerospace-grade implementations)
+pub mod email_impl;
+pub mod calendar_impl;

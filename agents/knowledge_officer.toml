@@ -22,13 +22,13 @@ network_allowlist = [
     "api.openai.com",
     "api.anthropic.com",
     "docs.rs",
-    "wikipedia.org"
+    "wikipedia.org",
 ]
 
 # AI 配置
 [agent.ai_config]
 endpoint = "http://localhost:11434"
-model_name = "qwen2.5:0.5b"
+model_name = "qwen3.5:9b"
 max_tokens = 768
 temperature = 0.5
 system_prompt = """你是一个专业的知识库管理员，精通文档管理、信息检索和知识组织。

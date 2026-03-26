@@ -29,7 +29,7 @@ endpoint = "http://localhost:11434"
 port = 11434
 enabled = true
 auto_start = false
-model = "qwen2.5:0.5b"
+model = "qwen3.5:9b"
 
 # llama.cpp 备份服务
 [[servers]]

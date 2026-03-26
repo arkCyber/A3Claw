@@ -56,7 +56,7 @@ pub static HI: Strings = Strings {
     set_endpoint: "एंडपॉइंट URL",
     set_endpoint_hint: "Ollama / OpenAI-संगत बेस URL",
     set_model: "मॉडल नाम",
-    set_model_hint: "उदा. qwen2.5:0.5b, llama3.2:1b",
+    set_model_hint: "उदा. qwen3.5:9b, llama3.2:latest",
     set_sandbox: "सैंडबॉक्स संसाधन सीमाएँ",
     set_sandbox_sub: "सैंडबॉक्स के लिए मेमोरी और पाथ कॉन्फ़िगरेशन।",
     set_memory: "मेमोरी लिमिट",

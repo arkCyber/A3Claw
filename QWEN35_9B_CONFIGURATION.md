@@ -57,7 +57,7 @@ model: "qwen3.5:9b".to_string(),
 const PRESET_MODELS: &[&str] = &[
     "qwen3.5:9b",  // ← 新增，放在首位
     "qwen2:7b", "qwen2.5:7b", "qwen2.5:14b", "qwen2.5:32b",
-    "llama3.1:8b", "llama3.1:70b", "llama3.2:3b",
+    "llama3.2:3b", "llama3.2:latest",
     "mistral:7b", "deepseek-r1:7b", "deepseek-r1:14b",
     "phi3:mini", "phi3:medium", "gemma2:9b", "gemma2:27b",
     "codellama:7b", "codellama:13b",
@@ -104,7 +104,7 @@ openclaw_ai_temperature_input: "0.6".to_string(),
 ```rust
 const PRESETS: &[&str] = &[
     "qwen3.5:9b",  // ← 新增到测试
-    "qwen2:7b", "qwen2.5:7b", "llama3.1:8b", "mistral:7b",
+    "qwen2:7b", "qwen2.5:7b", "llama3.2:latest", "mistral:7b",
     "deepseek-r1:7b", "phi3:mini", "gemma2:9b", "codellama:7b",
 ];
 ```
@@ -129,12 +129,12 @@ const PRESETS: &[&str] = &[
 
 ### 参数对比
 
-| 参数 | 之前 (Qwen 2.5 7B) | 现在 (Qwen 3.5 9B) | 说明 |
-|------|-------------------|-------------------|------|
-| **模型** | qwen2:7b | qwen3.5:9b | 升级到最新版本 |
-| **Temperature** | 0.7 | 0.6 | 更稳定的输出 |
-| **Top-K** | 40 | 50 | 更多样化的选择 |
-| **Max Tokens** | 4096 | 8192 | 支持更长的响应 |
+| 参数            | 之前 (Qwen 2.5 7B) | 现在 (Qwen 3.5 9B) | 说明           |
+| --------------- | ------------------ | ------------------ | -------------- |
+| **模型**        | qwen2:7b           | qwen3.5:9b         | 升级到最新版本 |
+| **Temperature** | 0.7                | 0.6                | 更稳定的输出   |
+| **Top-K**       | 40                 | 50                 | 更多样化的选择 |
+| **Max Tokens**  | 4096               | 8192               | 支持更长的响应 |
 
 ---
 

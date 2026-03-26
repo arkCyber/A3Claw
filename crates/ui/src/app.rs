@@ -1003,7 +1003,7 @@ pub enum RunMode {
 /// Detailed information about a locally available Ollama model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OllamaModel {
-    /// Model name (e.g. "qwen2.5:0.5b").
+    /// Model name (e.g. "qwen3.5:9b").
     pub name: String,
     /// Size in bytes.
     pub size_bytes: u64,
@@ -3992,7 +3992,8 @@ impl cosmic::Application for OpenClawApp {
                                 }
                             },
                             "news" => {
-                                match crate::news_tool::fetch_news("cnn", 5).await {
+                                // 使用 "latest news" 作为默认查询
+                                match crate::news_tool::fetch_news("latest news", 5).await {
                                     Ok(news) => news
                                         .lines()
                                         .map(|line| (line.to_string(), false))
@@ -5212,10 +5213,12 @@ impl cosmic::Application for OpenClawApp {
                             source: ClawEntrySource::User,
                         });
                         
+                        // 传递用户的完整查询，让新闻工具智能选择来源
+                        let query = message.clone();
                         // 异步获取新闻
                         return Task::perform(
                             async move {
-                                let news_result = crate::news_tool::fetch_news("cnn", 5).await;
+                                let news_result = crate::news_tool::fetch_news(&query, 5).await;
                                 AppMessage::ClawNewsFetched { user_entry_id, news_data: news_result }
                             },
                             cosmic::Action::App,

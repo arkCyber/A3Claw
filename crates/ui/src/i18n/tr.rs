@@ -56,7 +56,7 @@ pub static TR: Strings = Strings {
     set_endpoint: "Uç nokta URL",
     set_endpoint_hint: "Ollama / OpenAI uyumlu temel URL",
     set_model: "Model adı",
-    set_model_hint: "örn. qwen2.5:0.5b, llama3.2:1b",
+    set_model_hint: "örn. qwen3.5:9b, llama3.2:latest",
     set_sandbox: "Sandbox kaynak limitleri",
     set_sandbox_sub: "Sandbox için bellek ve yol yapılandırması.",
     set_memory: "Bellek limiti",

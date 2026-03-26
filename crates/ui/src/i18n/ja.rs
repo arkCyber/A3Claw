@@ -56,7 +56,7 @@ pub static JA: Strings = Strings {
     set_endpoint:       "エンドポイント URL",
     set_endpoint_hint:  "Ollama / OpenAI 互換ベース URL",
     set_model:          "モデル名",
-    set_model_hint:     "例: qwen2.5:0.5b, llama3.2:1b",
+    set_model_hint:     "例: qwen3.5:9b, llama3.2:latest",
     set_sandbox:        "サンドボックスリソース制限",
     set_sandbox_sub:    "サンドボックスのメモリとパス設定。",
     set_memory:         "メモリ制限",

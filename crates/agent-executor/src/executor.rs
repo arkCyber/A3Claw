@@ -35,7 +35,7 @@ impl Default for ExecutorConfig {
     fn default() -> Self {
         Self {
             llm_endpoint: "http://localhost:11434".into(),
-            model: "qwen2.5:0.5b".into(),
+            model: "qwen3.5:9b".into(),
             api_key: String::new(),
             temperature: 0.2,
             max_tokens: 2048,
@@ -406,7 +406,7 @@ mod tests {
         assert_eq!(cfg.gateway_port, 7878);
         assert_eq!(cfg.max_steps, 20);
         assert!(cfg.is_ollama);
-        assert_eq!(cfg.model, "qwen2.5:0.5b");
+        assert_eq!(cfg.model, "qwen3.5:9b");
     }
 
     #[test]

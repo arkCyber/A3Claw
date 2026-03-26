@@ -56,7 +56,7 @@ pub static TW: Strings = Strings {
     set_endpoint:       "端點 URL",
     set_endpoint_hint:  "Ollama / OpenAI 相容介面位址",
     set_model:          "模型名稱",
-    set_model_hint:     "例如 qwen2.5:0.5b, llama3.2:1b",
+    set_model_hint:     "例如 qwen3.5:9b, llama3.2:latest",
     set_sandbox:        "沙盒資源限制",
     set_sandbox_sub:    "沙盒的記憶體與路徑設定。",
     set_memory:         "記憶體限制",

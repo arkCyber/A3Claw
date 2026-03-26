@@ -1192,7 +1192,7 @@ impl AssistantPage {
                 const PRESET_MODELS: &[&str] = &[
                     "qwen3.5:9b",
                     "qwen2:7b", "qwen2.5:7b", "qwen2.5:14b", "qwen2.5:32b",
-                    "llama3.1:8b", "llama3.1:70b", "llama3.2:3b",
+                    "llama3.2:3b", "llama3.2:latest",
                     "mistral:7b", "deepseek-r1:7b", "deepseek-r1:14b",
                     "phi3:mini", "phi3:medium", "gemma2:9b", "gemma2:27b",
                     "codellama:7b", "codellama:13b",
@@ -1432,7 +1432,7 @@ mod tests {
     #[test]
     fn preset_models_follow_name_tag_format() {
         const PRESETS: &[&str] = &[
-            "qwen3.5:9b", "qwen2:7b", "qwen2.5:7b", "llama3.1:8b", "mistral:7b",
+            "qwen3.5:9b", "qwen2:7b", "qwen2.5:7b", "llama3.2:latest", "mistral:7b",
             "deepseek-r1:7b", "phi3:mini", "gemma2:9b", "codellama:7b",
         ];
         for m in PRESETS {
@@ -1442,8 +1442,8 @@ mod tests {
 
     #[test]
     fn model_merge_no_duplicates() {
-        let loaded = vec!["qwen2:7b".to_string(), "llama3.1:8b".to_string()];
-        let presets = ["qwen2:7b", "mistral:7b", "llama3.1:8b", "phi3:mini"];
+        let loaded = vec!["qwen2:7b".to_string(), "llama3.2:latest".to_string()];
+        let presets = ["qwen2:7b", "mistral:7b", "llama3.2:latest", "phi3:mini"];
         let mut merged: Vec<String> = loaded.clone();
         for p in &presets {
             if !merged.iter().any(|n| n == *p) {
@@ -1459,7 +1459,7 @@ mod tests {
 
     #[test]
     fn model_merge_loaded_first() {
-        let loaded = vec!["qwen2:7b".to_string(), "llama3.1:8b".to_string()];
+        let loaded = vec!["qwen2:7b".to_string(), "llama3.2:latest".to_string()];
         let presets = ["qwen2:7b", "mistral:7b"];
         let mut merged: Vec<String> = loaded.clone();
         for p in &presets {
@@ -1468,14 +1468,14 @@ mod tests {
             }
         }
         assert_eq!(merged[0], "qwen2:7b");
-        assert_eq!(merged[1], "llama3.1:8b");
+        assert_eq!(merged[1], "llama3.2:latest");
         assert!(merged.contains(&"mistral:7b".to_string()));
     }
 
     #[test]
     fn selected_model_index() {
-        let names = vec!["qwen2:7b".to_string(), "llama3.1:8b".to_string(), "mistral:7b".to_string()];
-        assert_eq!(names.iter().position(|n| n == "llama3.1:8b"), Some(1));
+        let names = vec!["qwen2:7b".to_string(), "llama3.2:latest".to_string(), "mistral:7b".to_string()];
+        assert_eq!(names.iter().position(|n| n == "llama3.2:latest"), Some(1));
         assert_eq!(names.iter().position(|n| n == "nonexistent:1b"), None);
     }
 

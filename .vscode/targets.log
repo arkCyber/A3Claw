@@ -6,11 +6,8 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # PARTICULAR PURPOSE.
 
 # This program built for i386-apple-darwin11.3.0
- 
-make: *** No rule to make target `all'.  Stop.
 
-
-# Make data base, printed on Sat Mar 21 09:40:26 2026
+# Make data base, printed on Thu Mar 26 10:19:27 2026
 
 # Variables
 
@@ -19,13 +16,8 @@ make: *** No rule to make target `all'.  Stop.
 # automatic
 ?F = $(notdir $?)
 # environment
-WASMEDGE_LIB_DIR = /Users/arkSong/.wasmedge/lib
-# environment
 VSCODE_CRASH_REPORTER_PROCESS_TYPE = extensionHost
-# environment
-NVM_INC = /Users/arkSong/.nvm/versions/node/v22.13.1/include/node
 # automatic
- 
 ?D = $(patsubst %/,%,$(dir $?))
 # automatic
 @D = $(patsubst %/,%,$(dir $@))
@@ -48,45 +40,35 @@ GATEWAY := target/release/openclaw-plugin-gateway
 # environment
 __CFBundleIdentifier = com.exafunction.windsurf
 # environment
-INFOPATH = /opt/homebrew/share/info:
-# environment
 VSCODE_CWD = /
 # makefile (from `Makefile', line 55)
 STORE := target/release/openclaw-store
 # makefile (from `Makefile', line 59)
 APP_BUNDLE := /tmp/OpenClawStore.app
 # environment
-PATH = /Users/arkSong/.codeium/windsurf/bin:/Users/arkSong/Library/pnpm:/Users/arkSong/.bun/bin:/opt/homebrew/opt/llvm/bin:/usr/local/opt/llvm/bin:/Users/arkSong/.nvm/versions/node/v22.13.1/bin:/opt/homebrew/opt/libiconv/bin:/Users/arkSong/miniconda3/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pmk/env/global/bin:/opt/X11/bin:/Library/Apple/usr/bin:/opt/podman/bin:/Users/arkSong/.cargo/bin:/Users/arkSong/.wasmedge/bin:/Users/arkSong/Library/Application Support/JetBrains/Toolbox/scripts:/Users/arkSong/.local/bin:/Users/arkSong/.lmstudio/bin:/Users/arkSong/.local/bin:/Applications/Docker.app/Contents/Resources/bin
+PATH = /usr/bin:/bin:/usr/sbin:/sbin
 # environment
-LOG_DST = /Users/arkSong/Library/Application Support/Windsurf/logs/20260321T093939/window1/exthost/dendron.dendron/dendron.log
-# environment
-C_INCLUDE_PATH = /Users/arkSong/.wasmedge/include
-# environment
-LIBRARY_PATH = /Users/arkSong/.wasmedge/lib
-# environment
-PNPM_HOME = /Users/arkSong/Library/pnpm
-# environment
-NVM_BIN = /Users/arkSong/.nvm/versions/node/v22.13.1/bin
+LOG_DST = /Users/arkSong/Library/Application Support/Windsurf/logs/20260326T101849/window1/exthost/dendron.dendron/dendron.log
 # environment
 LOG_LEVEL = info
+# environment
+LaunchInstanceID = C210300C-A765-43AB-9045-E4B9C0EDB195
 # environment
 ELECTRON_RUN_AS_NODE = 1
 # makefile (from `Makefile', line 24)
 PORT := 54321
 # default
 .FEATURES := target-specific order-only second-expansion else-if archives jobserver check-symlink
+# makefile (from `Makefile', line 151)
+UI_BINARY := target/release/openclaw-plus
 # environment
-SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.WFSYuyiCL7/Listeners
-# environment
-CPLUS_INCLUDE_PATH = /Users/arkSong/.wasmedge/include
+SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.2eGxds0J2G/Listeners
 # automatic
 %F = $(notdir $%)
 # environment
-DISPLAY = /private/tmp/com.apple.launchd.dhVNDGVKhJ/org.xquartz:0
+DISPLAY = /private/tmp/com.apple.launchd.DWtqSXgbgQ/org.xquartz:0
 # environment
 PWD = /Users/arkSong/workspace/OpenClaw+
-# environment
-HOMEBREW_CELLAR = /opt/homebrew/Cellar
 # environment
 OSLogRateLimit = 64
 # environment
@@ -99,8 +81,6 @@ VSCODE_CODE_CACHE_PATH = /Users/arkSong/Library/Application Support/Windsurf/Cac
 LOGNAME = zhiliangyang
 # environment
 APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = true
-# environment
-NVM_CD_FLAGS = -q
 # environment
 VSCODE_HANDLES_UNCAUGHT_ERRORS = true
 # automatic
@@ -139,8 +119,6 @@ TMPDIR = /var/folders/xq/28rp5nw90dn923p29x9_schw0000gn/T/
 VSCODE_IPC_HOOK = /Users/arkSong/Library/Application Support/Windsurf/1.10-main.sock
 # environment
 MallocNanoZone = 0
-# environment
-BUN_INSTALL = /Users/arkSong/.bun
 # makefile (from `Makefile', line 23)
 CARGO := cargo
 # makefile
@@ -150,17 +128,13 @@ MFLAGS = -Rrqp
 # automatic
 *D = $(patsubst %/,%,$(dir $*))
 # environment
-NVM_DIR = /Users/arkSong/.nvm
-# environment
 XPC_SERVICE_NAME = application.com.exafunction.windsurf.174908524.174908530
-# environment
-HOMEBREW_PREFIX = /opt/homebrew
 # automatic
 +D = $(patsubst %/,%,$(dir $+))
+# environment
+VSCODE_L10N_BUNDLE_LOCATION = 
 # automatic
 +F = $(notdir $+)
-# environment
-HOMEBREW_REPOSITORY = /opt/homebrew
 # environment
 __CF_USER_TEXT_ENCODING = 0x1F5:0x19:0x34
 # environment
@@ -173,12 +147,14 @@ DETECTED_OS := macos
 <F = $(notdir $<)
 # environment
 LC_ALL = C
+# environment
+SECURITYSESSIONID = 186b7
 # automatic
 ^F = $(notdir $^)
 # default
 SUFFIXES := 
-# environment
-OLLAMA_ORIGINS = *
+# makefile (from `Makefile', line 152)
+UI_APP_BUNDLE := /tmp/OpenClawPlus.app
 # default
 .INCLUDE_DIRS = /usr/local/include
 # environment
@@ -188,9 +164,9 @@ LANG = C
 # makefile (from `Makefile', line 25)
 REGISTRY := /Users/arkSong/workspace/OpenClaw+/registry/index.json
 # environment
-VSCODE_PID = 3170
+VSCODE_PID = 716
 # variable set hash-table stats:
-# Load=87/1024=8%, Rehash=0, Collisions=2/121=2%
+# Load=77/1024=8%, Rehash=0, Collisions=2/110=2%
 
 # Pattern-specific Variable Values
 
@@ -198,9 +174,9 @@ VSCODE_PID = 3170
 
 # Directories
 
-# . (device 16777229, inode 172390459): 89 files, no impossibilities.
+# . (device 16777232, inode 172390459): 121 files, no impossibilities.
 
-# 89 files, no impossibilities in 1 directories.
+# 121 files, no impossibilities in 1 directories.
 
 # Implicit Rules
 
@@ -243,26 +219,49 @@ all:
 # variable set hash-table stats:
 # Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 
-.PHONY: build build-windows build-linux check test gateway macos-app store run clean fmt clippy smoke help
+.PHONY: build build-windows build-linux check test gateway macos-app store build-ui ui-app ui ui-open run clean fmt clippy smoke help
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
- 
+
+ui-open: ui-app
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 184):
+	@echo "✅  Opening NEW UI .app bundle..."
+	open -n $(UI_APP_BUNDLE)
+	
 
 macos-app: build
 #  Phony target (prerequisite of .PHONY).
 #  Implicit rule search has not been done.
 #  File does not exist.
 #  File has not been updated.
-#  commands to execute (from `Makefile', line 119):
+#  commands to execute (from `Makefile', line 121):
+	@echo "⚠️  WARNING: This is the OLD UI (openclaw-store)"
+	@echo "✅  Please use 'make ui-app' for the NEW UI with CLI Terminal"
+	@echo ""
+	@echo "Continuing in 3 seconds... Press Ctrl+C to cancel"
+	@sleep 3
 	mkdir -p $(APP_BUNDLE)/Contents/MacOS $(APP_BUNDLE)/Contents/Resources
 	cp $(STORE) $(APP_BUNDLE)/Contents/MacOS/openclaw-store
 	@printf '#!/bin/bash\nexport OPENCLAW_GATEWAY_URL=http://127.0.0.1:$(PORT)\nexport CLAWPLUS_REGISTRY_URL=file://$(REGISTRY)\nexport RUST_LOG=info\nDIR="$$(cd "$$(dirname "$$0")" && pwd)"\nexec "$$DIR/openclaw-store" "$$@"\n' \
 	> $(APP_BUNDLE)/Contents/MacOS/openclaw-store-launcher
 	chmod +x $(APP_BUNDLE)/Contents/MacOS/openclaw-store-launcher
-	@printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>CFBundleExecutable</key><string>openclaw-store-launcher</string>\n<key>CFBundleIdentifier</key><string>dev.clawplus.store</string>\n<key>CFBundleName</key><string>OpenClaw+ Store</string>\n<key>CFBundlePackageType</key><string>APPL</string>\n<key>NSHighResolutionCapable</key><true/>\n<key>NSPrincipalClass</key><string>NSApplication</string>\n</dict></plist>\n' \
+	@printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>CFBundleExecutable</key><string>openclaw-store-launcher</string>\n<key>CFBundleIdentifier</key><string>dev.clawplus.store</string>\n<key>CFBundleName</key><string>OpenClaw+ Store (OLD)</string>\n<key>CFBundlePackageType</key><string>APPL</string>\n<key>NSHighResolutionCapable</key><true/>\n<key>NSPrincipalClass</key><string>NSApplication</string>\n</dict></plist>\n' \
 	> $(APP_BUNDLE)/Contents/Info.plist
-	@echo "App bundle ready: $(APP_BUNDLE)"
+	@echo "⚠️  OLD UI App bundle ready: $(APP_BUNDLE)"
+	
+
+build-ui:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 157):
+	$(CARGO) build --release -p openclaw-ui
 	
 
 # Not a target:
@@ -274,7 +273,7 @@ macos-app: build
 # Not a target:
 Makefile:
 #  Implicit rule search has been done.
-#  Last modified 2026-02-23 06:10:15
+#  Last modified 2026-03-22 09:55:23
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -297,7 +296,7 @@ clippy:
 #  Implicit rule search has not been done.
 #  File does not exist.
 #  File has not been updated.
-#  commands to execute (from `Makefile', line 210):
+#  commands to execute (from `Makefile', line 241):
 	$(CARGO) clippy \
 	-p openclaw-security \
 	-p openclaw-plugin-gateway \
@@ -322,7 +321,7 @@ smoke:
 #  Implicit rule search has not been done.
 #  File does not exist.
 #  File has not been updated.
-#  commands to execute (from `Makefile', line 220):
+#  commands to execute (from `Makefile', line 251):
 	@echo "=== /health ===" && curl -sf http://127.0.0.1:$(PORT)/health
 	@echo "\n=== /ready ===" && curl -sf http://127.0.0.1:$(PORT)/ready
 	@echo "\n=== /skills/status ===" && curl -sf http://127.0.0.1:$(PORT)/skills/status
@@ -342,7 +341,7 @@ help:
 #  Implicit rule search has not been done.
 #  File does not exist.
 #  File has not been updated.
-#  commands to execute (from `Makefile', line 237):
+#  commands to execute (from `Makefile', line 268):
 	@echo "OpenClaw+ build system  (detected OS: $(DETECTED_OS))"
 	@echo ""
 	@echo "Targets:"
@@ -368,20 +367,32 @@ help:
 #  Modification time never checked.
 #  File has not been updated.
 
-run: macos-app
+ui: build-ui
 #  Phony target (prerequisite of .PHONY).
 #  Implicit rule search has not been done.
 #  File does not exist.
 #  File has not been updated.
-#  commands to execute (from `Makefile', line 161):
+#  commands to execute (from `Makefile', line 176):
+	@echo "✅  Launching NEW UI (openclaw-plus)..."
+	OPENCLAW_GATEWAY_URL=http://127.0.0.1:$(PORT) \
+	RUST_LOG=info \
+	$(UI_BINARY)
+	
+
+run: ui-app
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 192):
 	@echo "Starting plugin gateway on port $(PORT)…"
 	OPENCLAW_GATEWAY_URL=http://127.0.0.1:$(PORT) \
 	CLAWPLUS_REGISTRY_URL=file://$(REGISTRY) \
 	RUST_LOG=info \
 	$(GATEWAY) --port $(PORT) &
 	@sleep 1
-	@echo "Launching plugin store UI…"
-	open -n $(APP_BUNDLE)
+	@echo "✅  Launching NEW UI with CLI Terminal..."
+	open -n $(UI_APP_BUNDLE)
 	
 
 clean:
@@ -389,7 +400,7 @@ clean:
 #  Implicit rule search has not been done.
 #  File does not exist.
 #  File has not been updated.
-#  commands to execute (from `Makefile', line 202):
+#  commands to execute (from `Makefile', line 233):
 	$(CARGO) clean
 	
 
@@ -398,7 +409,7 @@ fmt:
 #  Implicit rule search has not been done.
 #  File does not exist.
 #  File has not been updated.
-#  commands to execute (from `Makefile', line 206):
+#  commands to execute (from `Makefile', line 237):
 	$(CARGO) fmt --all
 	
 
@@ -414,13 +425,20 @@ gateway: build
 	$(GATEWAY) --port $(PORT)
 	
 
-store: macos-app
+store:
 #  Phony target (prerequisite of .PHONY).
 #  Implicit rule search has not been done.
 #  File does not exist.
 #  File has not been updated.
-#  commands to execute (from `Makefile', line 132):
-	open -n $(APP_BUNDLE)
+#  commands to execute (from `Makefile', line 139):
+	@echo "⚠️  ERROR: 'make store' is DEPRECATED (old UI)"
+	@echo "✅  Please use 'make ui' or 'make ui-app' for the NEW UI"
+	@echo ""
+	@echo "The new UI includes:"
+	@echo "  • CLI Terminal sidebar"
+	@echo "  • Improved interface"
+	@echo "  • Better performance"
+	@exit 1
 	
 
 check:
@@ -435,8 +453,26 @@ check:
 	-p openclaw-store
 	
 
+ui-app: build-ui
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 162):
+	@echo "✅  Creating NEW UI .app bundle with CLI Terminal..."
+	mkdir -p $(UI_APP_BUNDLE)/Contents/MacOS $(UI_APP_BUNDLE)/Contents/Resources
+	cp $(UI_BINARY) $(UI_APP_BUNDLE)/Contents/MacOS/openclaw-plus
+	@printf '#!/bin/bash\nexport OPENCLAW_GATEWAY_URL=http://127.0.0.1:$(PORT)\nexport RUST_LOG=info\nDIR="$$(cd "$$(dirname "$$0")" && pwd)"\nexec "$$DIR/openclaw-plus" "$$@"\n' \
+	> $(UI_APP_BUNDLE)/Contents/MacOS/openclaw-plus-launcher
+	chmod +x $(UI_APP_BUNDLE)/Contents/MacOS/openclaw-plus-launcher
+	@printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>CFBundleExecutable</key><string>openclaw-plus-launcher</string>\n<key>CFBundleIdentifier</key><string>dev.clawplus.ui</string>\n<key>CFBundleName</key><string>OpenClaw+ UI</string>\n<key>CFBundlePackageType</key><string>APPL</string>\n<key>NSHighResolutionCapable</key><true/>\n<key>NSPrincipalClass</key><string>NSApplication</string>\n</dict></plist>\n' \
+	> $(UI_APP_BUNDLE)/Contents/Info.plist
+	@echo "✅  NEW UI App bundle ready: $(UI_APP_BUNDLE)"
+	@echo "    Features: CLI Terminal, AI Assistant, Security Dashboard"
+	
+
 # files hash-table stats:
-# Load=19/1024=2%, Rehash=0, Collisions=0/62=0%
+# Load=23/1024=2%, Rehash=0, Collisions=0/76=0%
 # VPATH Search Paths
 
 # No `vpath' search paths.
@@ -448,6 +484,8 @@ check:
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
 
-# Finished Make data base on Sat Mar 21 09:40:26 2026
+# Finished Make data base on Thu Mar 26 10:19:27 2026
 
  
+make: *** No rule to make target `all'.  Stop.
+

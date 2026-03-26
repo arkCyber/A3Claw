@@ -18,17 +18,12 @@ confirm_network = true
 confirm_shell_exec = true
 
 # 网络白名单 - 代码审查可能需要访问 API 文档
-network_allowlist = [
-    "api.github.com",
-    "api.openai.com",
-    "docs.rs",
-    "crates.io"
-]
+network_allowlist = ["api.github.com", "api.openai.com", "docs.rs", "crates.io"]
 
 # AI 配置
 [agent.ai_config]
 endpoint = "http://localhost:11434"
-model_name = "qwen2.5:0.5b"
+model_name = "qwen3.5:9b"
 max_tokens = 1024
 temperature = 0.3
 system_prompt = """你是一个专业的代码审查员，精通多种编程语言和最佳实践。

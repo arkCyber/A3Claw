@@ -90,14 +90,16 @@ impl CliTerminalState {
         let welcome_entry = CliHistoryEntry {
             command: String::new(),
             output: vec![
-                ("╔══════════════════════════════════════════════════════════════════╗".to_string(), false),
-                ("║          OpenClaw+ CLI Terminal - Aerospace Grade v1.0          ║".to_string(), false),
-                ("╚══════════════════════════════════════════════════════════════════╝".to_string(), false),
                 ("".to_string(), false),
-                ("Welcome to OpenClaw+ Command Line Interface".to_string(), false),
+                ("  ╭─────────────────────────────────────────────────────────────╮".to_string(), false),
+                ("  │     OpenClaw+ CLI Terminal - Elegant Edition v2.0          │".to_string(), false),
+                ("  ╰─────────────────────────────────────────────────────────────╯".to_string(), false),
                 ("".to_string(), false),
-                ("System Information:".to_string(), false),
-                (format!("  • Platform:       {}", std::env::consts::OS), false),
+                ("  Welcome to OpenClaw+ Command Line Interface".to_string(), false),
+                ("  素雅设计 · 简约高效 · 安全可靠".to_string(), false),
+                ("".to_string(), false),
+                ("  System Information:".to_string(), false),
+                (format!("    Platform:       {}", std::env::consts::OS), false),
                 (format!("  • Architecture:   {}", std::env::consts::ARCH), false),
                 (format!("  • Version:        v0.1.0"), false),
                 (format!("  • Build:          Debug (Aerospace-grade)"), false),
@@ -248,12 +250,15 @@ impl CliTerminalPage {
         lang: Language,
         state: &'a CliTerminalState,
     ) -> Element<'a, AppMessage> {
-        // Terminal color scheme - professional and readable
-        let color_prompt = cosmic::iced::Color::from_rgb(0.28, 0.92, 0.78);    // Cyan for $
-        let color_command = cosmic::iced::Color::from_rgb(0.98, 0.98, 0.98);   // White for commands
-        let color_error = cosmic::iced::Color::from_rgb(0.98, 0.38, 0.38);     // Red for errors
-        let color_output = cosmic::iced::Color::from_rgb(0.78, 0.88, 0.98);    // Light blue for output
-        let color_muted = cosmic::iced::Color::from_rgb(0.52, 0.50, 0.48);     // Gray for hints
+        // Terminal color scheme - Elegant and soothing (素雅配色)
+        // Inspired by Japanese minimalism and Nordic design
+        let color_prompt = cosmic::iced::Color::from_rgb(0.42, 0.75, 0.68);    // Soft teal (柔和青绿) for $
+        let color_command = cosmic::iced::Color::from_rgb(0.85, 0.88, 0.92);   // Soft white-blue (淡雅白蓝) for commands
+        let color_error = cosmic::iced::Color::from_rgb(0.92, 0.55, 0.52);     // Soft coral (柔和珊瑚红) for errors
+        let color_output = cosmic::iced::Color::from_rgb(0.68, 0.78, 0.85);    // Muted sky blue (静谧天蓝) for output
+        let color_success = cosmic::iced::Color::from_rgb(0.58, 0.78, 0.65);   // Sage green (鼠尾草绿) for success
+        let color_muted = cosmic::iced::Color::from_rgb(0.62, 0.64, 0.66);     // Warm gray (温暖灰) for hints
+        let color_timestamp = cosmic::iced::Color::from_rgb(0.72, 0.70, 0.68); // Beige gray (米灰) for timestamps
 
         // Header
         let header = widget::row::with_children(vec![

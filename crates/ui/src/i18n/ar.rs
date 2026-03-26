@@ -56,7 +56,7 @@ pub static AR: Strings = Strings {
     set_endpoint: "عنوان Endpoint",
     set_endpoint_hint: "عنوان أساسي متوافق مع Ollama / OpenAI",
     set_model: "اسم النموذج",
-    set_model_hint: "مثال: qwen2.5:0.5b, llama3.2:1b",
+    set_model_hint: "مثال: qwen3.5:9b, llama3.2:latest",
     set_sandbox: "حدود موارد صندوق الحماية",
     set_sandbox_sub: "تهيئة الذاكرة والمسارات لصندوق الحماية.",
     set_memory: "حد الذاكرة",

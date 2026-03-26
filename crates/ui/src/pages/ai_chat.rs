@@ -135,13 +135,13 @@ impl Default for AiChatState {
         Self {
             messages: vec![
                 ChatMessage::system(
-                    "AI assistant connected. Using Qwen2.5:0.5b via Ollama. \
+                    "AI assistant connected. Using Qwen3.5:9b via Ollama. \
                      Type a message and press Enter or click Send."
                 ),
             ],
             input: String::new(),
             status: EngineStatus::Idle,
-            model_name: "qwen2.5:0.5b".into(),
+            model_name: "qwen3.5:9b".into(),
             endpoint: "http://localhost:11434".into(),
             total_tokens: 0,
             total_calls: 0,
@@ -191,10 +191,10 @@ pub struct AiChatPage;
 
 /// Preset model options shown in the model selector.
 const MODEL_PRESETS: &[&str] = &[
-    "qwen2.5:0.5b",
-    "qwen2.5:1.5b",
-    "qwen2.5:3b",
-    "llama3.2:1b",
+    "qwen3.5:9b",
+    "qwen2.5:7b",
+    "qwen2.5:14b",
+    "llama3.2:latest",
     "llama3.2:3b",
     "phi3.5:mini",
     "gemma2:2b",

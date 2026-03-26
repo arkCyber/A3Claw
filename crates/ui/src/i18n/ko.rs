@@ -28,7 +28,7 @@ pub static KO: Strings = Strings {
     set_theme_default: "기본 다크로 전환", set_ai: "AI 추론",
     set_ai_sub: "로컬 AI 추론 백엔드를 구성합니다.",
     set_endpoint: "엔드포인트 URL", set_endpoint_hint: "Ollama / OpenAI 호환 기본 URL",
-    set_model: "모델 이름", set_model_hint: "예: qwen2.5:0.5b, llama3.2:1b",
+    set_model: "모델 이름", set_model_hint: "예: qwen3.5:9b, llama3.2:latest",
     set_sandbox: "샌드박스 리소스 제한", set_sandbox_sub: "샌드박스의 메모리 및 경로 구성.",
     set_memory: "메모리 제한", set_memory_hint: "샌드박스가 할당할 수 있는 최대 메모리",
     set_entry: "OpenClaw 항목", set_entry_hint: "OpenClaw 메인 스크립트 경로",

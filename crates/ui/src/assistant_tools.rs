@@ -500,7 +500,7 @@ impl AssistantTool {
                  2️⃣ 启动 Ollama 服务\n\
                     ollama serve\n\n\
                  3️⃣ 下载模型\n\
-                    ollama pull qwen2.5:0.5b\n\
+                    ollama pull qwen3.5:9b\n\
                     ollama pull llama3.2\n\n\
                  4️⃣ 验证安装\n\
                     ollama list\n\
@@ -516,7 +516,7 @@ impl AssistantTool {
                     点击侧边栏 'AI Chat' 标签\n\n\
                  2️⃣ 检查模型选择器\n\
                     应自动显示已安装的模型\n\
-                    如: qwen2.5:0.5b, llama3.2\n\n\
+                    如: qwen3.5:9b, llama3.2\n\n\
                  3️⃣ 配置端点（可选）\n\
                     默认: http://localhost:11434\n\
                     可在设置中修改\n\n\
@@ -562,7 +562,7 @@ impl AssistantTool {
                  ✓ 重启服务: pkill ollama && ollama serve\n\n\
                  【问题 2: 模型列表为空】\n\
                  ✓ 检查模型: ollama list\n\
-                 ✓ 下载模型: ollama pull qwen2.5:0.5b\n\
+                 ✓ 下载模型: ollama pull qwen3.5:9b\n\
                  ✓ 刷新 UI: 切换页面\n\n\
                  【问题 3: AI 返回 Fallback】\n\
                  ✓ 检查模型名称是否正确\n\

@@ -47,7 +47,7 @@ brew install ollama
 ollama serve
 
 # 下载模型
-ollama pull qwen2.5:0.5b
+ollama pull qwen3.5:9b
 ```
 
 **健康检查**：
@@ -106,7 +106,7 @@ use openclaw_inference::{InferenceConfig, BackendKind};
 let config = InferenceConfig {
     backend: BackendKind::Ollama,
     endpoint: "http://localhost:11434".into(),
-    model_name: "qwen2.5:0.5b".into(),
+    model_name: "qwen3.5:9b".into(),
     max_tokens: 256,
     temperature: 0.7,
     inference_timeout: Duration::from_secs(30),
@@ -124,7 +124,7 @@ use std::time::Duration;
 let primary_config = InferenceConfig {
     backend: BackendKind::Ollama,
     endpoint: "http://localhost:11434".into(),
-    model_name: "qwen2.5:0.5b".into(),
+    model_name: "qwen3.5:9b".into(),
     max_tokens: 256,
     temperature: 0.7,
     inference_timeout: Duration::from_secs(30),
@@ -313,7 +313,7 @@ async fn select_fastest_backend() -> InferenceConfig {
 ### 本地开发环境
 
 - [ ] Ollama 已安装并运行
-- [ ] 模型已下载 (`ollama pull qwen2.5:0.5b`)
+- [ ] 模型已下载 (`ollama pull qwen3.5:9b`)
 - [ ] HTTP backend demo 测试通过
 - [ ] 健康检查脚本可用
 

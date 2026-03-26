@@ -179,7 +179,7 @@ impl AiProvider {
 
     pub fn default_model(&self) -> &'static str {
         match self {
-            AiProvider::Ollama        => "qwen2.5:0.5b",
+            AiProvider::Ollama        => "qwen3.5:9b",
             AiProvider::LlamaCppHttp  => "local-model",
             AiProvider::OpenAi        => "gpt-4o-mini",
             AiProvider::Anthropic     => "claude-3-haiku-20240307",

@@ -2,7 +2,7 @@
 //!
 //! Runs a series of checks on startup:
 //!   1. Ollama service — reachable? auto-start if not.
-//!   2. Local AI model installed (qwen2.5:0.5b or configured model).
+//!   2. Local AI model installed (qwen3.5:9b or configured model).
 //!   3. External AI APIs (OpenAI, DeepSeek, Anthropic) — optional, based on config.
 //!   4. WasmEdge runtime — needed for WASM policy plugins.
 //!   5. OpenClaw Gateway — optional integration.

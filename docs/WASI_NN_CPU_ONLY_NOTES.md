@@ -97,7 +97,7 @@ let config = ConfigBuilder::new(CommonConfigOptions::default())
 let config = InferenceConfig {
     backend: BackendKind::Ollama,
     endpoint: "http://localhost:11434".into(),
-    model_name: "qwen2.5:0.5b".into(),
+    model_name: "qwen3.5:9b".into(),
     // ...
 };
 ```

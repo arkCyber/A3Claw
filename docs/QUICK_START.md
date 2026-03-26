@@ -141,7 +141,7 @@ cargo run --release -p openclaw-plus
 [openclaw_ai]
 provider = "ollama"
 endpoint = "http://localhost:11434"
-model = "qwen2.5:0.5b"
+model = "qwen3.5:9b"
 temperature = 0.7
 ```
 
